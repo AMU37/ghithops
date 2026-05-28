@@ -11,7 +11,7 @@ const empFields: CrudField[] = [
   { name: "full_name", label: "الاسم", type: "text", required: true },
   { name: "phone", label: "الجوال", type: "text" },
   { name: "email", label: "البريد", type: "text" },
-  { name: "company", label: "الشركة", type: "select", fkEndpoint: "/companies/", fkLabel: "name" },
+  { name: "company", label: "الشركة المستفيدة", type: "select", fkEndpoint: "/companies/", fkLabel: "name" },
   { name: "department_name", label: "القسم", type: "text" },
   { name: "position", label: "المسمى الوظيفي", type: "text" },
   { name: "shift_type", label: "نوع الدوام", type: "select", fkEndpoint: "/employees/shift_types/", fkLabel: "name" },
@@ -47,7 +47,7 @@ export default function EmployeesPage() {
         <TabsContent value="employees">
           <CrudDataTable title="الموظفين" endpoint="/employees/"
             columns={["employee_id", "full_name", "phone", "company_name", "department_name", "position", "shift_type_name", "service_type_name", "city", "status"]}
-            labels={{ employee_id: "الكود", full_name: "الاسم", phone: "الجوال", company_name: "الشركة", department_name: "القسم", position: "المسمى", shift_type_name: "نوع الدوام", service_type_name: "نوع الخدمة", city: "المدينة", status: "الحالة" }}
+            labels={{ employee_id: "الكود", full_name: "الاسم", phone: "الجوال", company_name: "الشركة المستفيدة", department_name: "القسم", position: "المسمى", shift_type_name: "نوع الدوام", service_type_name: "نوع الخدمة", city: "المدينة", status: "الحالة" }}
             fields={empFields}
             renderCell={(col, row) => {
               if (col === "status") {
