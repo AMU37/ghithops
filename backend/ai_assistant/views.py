@@ -259,11 +259,10 @@ class AIChatViewSet(viewsets.ModelViewSet):
         model = genai.GenerativeModel(
             'gemini-2.5-flash',
             system_instruction=SYSTEM_INSTRUCTION,
-            tools=TOOLS,
         )
 
         response = model.generate_content(gemini_contents)
-        return response, model, gemini_contents
+        return response.text
 
     def _process_response(self, response, model, gemini_contents, chat):
         """Handle Gemini response – if it's a function_call, execute & complete the turn."""
@@ -331,9 +330,9 @@ class AIChatViewSet(viewsets.ModelViewSet):
         AIMessage.objects.create(chat=chat, role='user', content=message)
 
         try:
-            response, model, contents = self._call_gemini(chat, message)
-            reply = self._process_response(response, model, contents, chat)
+            reply = self._call_gemini(chat, message)
 
+            AIMessage.objects.create(chat=chat, role='assistant', content=reply)
             return Response({
                 'chat_id': chat.id,
                 'reply': reply,
@@ -342,7 +341,7 @@ class AIChatViewSet(viewsets.ModelViewSet):
         except Exception as e:
             import traceback
             error_msg = traceback.format_exc()
-            reply = "عذراً، حدث خطأ في الاتصال بالمساعد الذكي. يرجى التحقق من مفتاح API."
+            reply = "عذراً، حدث خطأ في الاتصال بالمساعد الذكي."
             AIMessage.objects.create(chat=chat, role='assistant', content=reply)
             return Response({
                 'chat_id': chat.id,
@@ -360,9 +359,9 @@ class AIChatViewSet(viewsets.ModelViewSet):
         chat.messages.filter(role='assistant', chat=chat).delete()
 
         try:
-            response, model, contents = self._call_gemini(chat, last_user_msg.content)
-            reply = self._process_response(response, model, contents, chat)
+            reply = self._call_gemini(chat, last_user_msg.content)
 
+            AIMessage.objects.create(chat=chat, role='assistant', content=reply)
             return Response({
                 'chat_id': chat.id,
                 'reply': reply,
