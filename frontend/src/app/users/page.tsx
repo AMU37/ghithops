@@ -148,23 +148,18 @@ export default function UsersPage() {
                   {companies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
-              {form.role === "department_user" && (
-                <div className="space-y-2">
-                  <Label htmlFor="department">القسم</Label>
-                  <select
-                    id="department"
-                    className="flex h-9 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-1 text-sm text-zinc-100"
-                    value={form.department}
-                    onChange={(e) => setForm({ ...form, department: e.target.value })}
-                  >
-                    <option value="">اختر قسم</option>
-                    {filteredDepartments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-                  </select>
-                </div>
-              )}
-              {form.role === "company_admin" && (
-                <p className="text-xs text-zinc-500">مدير الشركة لا يحتاج قسم - له صلاحية كاملة على شركته</p>
-              )}
+              <div className="space-y-2">
+                <Label htmlFor="department">القسم</Label>
+                <select
+                  id="department"
+                  className="flex h-9 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-1 text-sm text-zinc-100"
+                  value={form.department}
+                  onChange={(e) => setForm({ ...form, department: e.target.value })}
+                >
+                  <option value="">بدون قسم</option>
+                  {filteredDepartments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                </select>
+              </div>
               <div className="space-y-2">
                 <Label htmlFor="role">الصلاحية</Label>
                 <select
