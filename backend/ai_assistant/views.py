@@ -60,10 +60,10 @@ class AIChatViewSet(viewsets.ModelViewSet):
             genai.configure(api_key=__import__('os').environ.get('GEMINI_API_KEY', ''))
 
             history = list(chat.messages.all().values('role', 'content'))
-            gemini_history = []
-            for msg in history:
-                role = "user" if msg['role'] == "user" else "model"
-                gemini_history.append({"role": role, "parts": [msg['content']]})
+            gemini_history = [
+                {"role": "user" if m['role'] == "user" else "model", "parts": [m['content']]}
+                for m in history[:-1]  # exclude the current user message (already passed via send_message)
+            ]
 
             model = genai.GenerativeModel(
                 'gemini-2.0-flash',
@@ -109,10 +109,10 @@ class AIChatViewSet(viewsets.ModelViewSet):
             genai.configure(api_key=__import__('os').environ.get('GEMINI_API_KEY', ''))
 
             history = list(chat.messages.all().values('role', 'content'))
-            gemini_history = []
-            for msg in history:
-                role = "user" if msg['role'] == "user" else "model"
-                gemini_history.append({"role": role, "parts": [msg['content']]})
+            gemini_history = [
+                {"role": "user" if m['role'] == "user" else "model", "parts": [m['content']]}
+                for m in history[:-1]  # exclude the last user message (resend via send_message below)
+            ]
 
             model = genai.GenerativeModel(
                 'gemini-2.0-flash',
