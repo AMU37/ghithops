@@ -66,7 +66,7 @@ class AIChatViewSet(viewsets.ModelViewSet):
             ]
 
             model = genai.GenerativeModel(
-                'gemini-2.0-flash',
+                'gemini-2.5-flash',
                 system_instruction="أنت مساعد ذكي لنظام غيث لأتمتة العمليات الإدارية التشغيلية. أجب باللغة العربية."
             )
             chat_session = model.start_chat(history=gemini_history)
@@ -115,7 +115,7 @@ class AIChatViewSet(viewsets.ModelViewSet):
             ]
 
             model = genai.GenerativeModel(
-                'gemini-2.0-flash',
+                'gemini-2.5-flash',
                 system_instruction="أنت مساعد ذكي لنظام غيث."
             )
             chat_session = model.start_chat(history=gemini_history)
