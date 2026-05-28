@@ -16,10 +16,11 @@ class Command(BaseCommand):
         wb = openpyxl.load_workbook(EXCEL_PATH)
         ws = wb.active
 
-        company = Company.objects.filter(name=COMPANY_NAME).first()
-        if not company:
-            self.stdout.write(self.style.ERROR(f'Company "{COMPANY_NAME}" not found!'))
-            return
+        company, created = Company.objects.get_or_create(
+            name=COMPANY_NAME, defaults={'code': 'YCSR'}
+        )
+        if created:
+            self.stdout.write(f'Created company: {COMPANY_NAME}')
 
         dept_set, shift_set, service_set = set(), set(), set()
         excel_data = []
@@ -46,20 +47,20 @@ class Command(BaseCommand):
 
         self.stdout.write(f'Rows: {len(excel_data)}, Depts: {len(dept_set)}, Shifts: {len(shift_set)}, Services: {len(service_set)}')
 
-        existing_depts = set(Department.objects.values_list('name', flat=True))
+        existing_depts = set(Department.objects.filter(company=company).values_list('name', flat=True))
         for dname in sorted(dept_set):
             if dname not in existing_depts:
                 Department.objects.create(name=dname, company=company)
                 existing_depts.add(dname)
         self.stdout.write(f'Departments: {len(existing_depts)}')
 
-        shift_map = {s.name: s for s in ShiftType.objects.all()}
+        shift_map = {s.name: s for s in ShiftType.objects.filter(company=company)}
         for sname in sorted(shift_set):
             if sname not in shift_map:
                 shift_map[sname] = ShiftType.objects.create(name=sname, company=company)
         self.stdout.write(f'Shift types: {len(shift_map)}')
 
-        service_map = {s.name: s for s in ServiceType.objects.all()}
+        service_map = {s.name: s for s in ServiceType.objects.filter(company=company)}
         for svname in sorted(service_set):
             if svname not in service_map:
                 service_map[svname] = ServiceType.objects.create(name=svname, company=company)
@@ -80,7 +81,7 @@ class Command(BaseCommand):
             dept_obj = None
             if d['department']:
                 if d['department'] not in dept_cache:
-                    dept_cache[d['department']] = Department.objects.filter(name=d['department']).first()
+                    dept_cache[d['department']] = Department.objects.filter(company=company, name=d['department']).first()
                 dept_obj = dept_cache[d['department']]
             Employee.objects.create(
                 employee_id=d['employee_id'],
