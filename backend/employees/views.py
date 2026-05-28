@@ -89,13 +89,21 @@ class EmployeeViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'])
     def shift_types(self, request):
-        qs = ShiftType.objects.filter(company=request.user.company, status='active')
+        user = request.user
+        if user.role == 'super_admin':
+            qs = ShiftType.objects.filter(status='active')
+        else:
+            qs = ShiftType.objects.filter(company=user.company, status='active')
         serializer = ShiftTypeReadOnlySerializer(qs, many=True)
         return Response(serializer.data)
 
     @action(detail=False, methods=['get'])
     def service_types(self, request):
-        qs = ServiceType.objects.filter(company=request.user.company, status='active')
+        user = request.user
+        if user.role == 'super_admin':
+            qs = ServiceType.objects.filter(status='active')
+        else:
+            qs = ServiceType.objects.filter(company=user.company, status='active')
         serializer = ServiceTypeSerializer(qs, many=True)
         return Response(serializer.data)
 
@@ -104,7 +112,11 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         dept_id = request.query_params.get('department_id')
         if not dept_id:
             return Response([])
-        qs = Employee.objects.filter(company=request.user.company, department_id=dept_id)
+        user = request.user
+        if user.role == 'super_admin':
+            qs = Employee.objects.filter(department_id=dept_id)
+        else:
+            qs = Employee.objects.filter(company=user.company, department_id=dept_id)
         return Response(EmployeeSerializer(qs, many=True).data)
 
 
