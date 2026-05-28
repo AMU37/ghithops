@@ -1,0 +1,120 @@
+{% extends 'base.html' %}
+{% block title %}خطوط السير - الگھیث للنقليات{% endblock %}
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+        <h4><i class="fas fa-route"></i> خطوط السير</h4>
+        <div class="d-flex gap-2">
+            <div class="dropdown" style="position:relative">
+                <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" onclick="var d=document.getElementById('colToggle');d.style.display=d.style.display=='none'?'block':'none'">
+                    <i class="fas fa-table-cells"></i> تخصيص الأعمدة
+                </button>
+                <div id="colToggle" style="max-height:300px;overflow-y:auto;min-width:160px;display:none;position:absolute;right:0;z-index:1000;background:#fff;border:1px solid #ddd;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,.15);padding:8px">
+                    {% for key, label in [('id','#'),('name','الاسم'),('area','المنطقة'),('status','الحالة'),('actions','الإجراءات')] %}
+                    <label style="display:block;padding:4px 8px;cursor:pointer;white-space:nowrap">
+                        <input type="checkbox" class="col-toggle" data-col="{{ key }}" {{ 'checked' if key in ('name','actions') else '' }} onchange="toggleCol(this)">
+                        {{ label }}
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="openModal('addRouteModal')"><i class="fas fa-plus"></i> إضافة خط</button>
+        </div>
+    </div>
+    <div class="card">
+        <div class="card-body p-0">
+            {% if routes %}
+            <div class="table-responsive">
+            <table class="table table-hover mb-0" id="routeTable">
+                <thead><tr>
+                    <th data-col="id">#</th><th data-col="name">الاسم</th><th data-col="area">المنطقة</th>
+                    <th data-col="status">الحالة</th><th data-col="actions">الإجراءات</th>
+                </tr></thead>
+                <tbody>
+                {% for r in routes %}
+                <tr>
+                    <td data-col="id">{{ r.id }}</td>
+                    <td data-col="name"><strong>{{ r.name }}</strong></td>
+                    <td data-col="area">{{ r.area or '-' }}</td>
+                    <td data-col="status"><span class="badge bg-{{ 'success' if r.status == 'active' else 'danger' }}">{{ r.status }}</span></td>
+                    <td data-col="actions">
+                        <button class="btn btn-warning btn-sm" onclick="openModal('editRouteModal{{ r.id }}')"><i class="fas fa-edit"></i></button>
+                        <form action="{{ url_for('employee_transport.delete_route', id=r.id) }}" method="POST" style="display:inline">
+                            <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('حذف الخط {{ r.name }}؟')"><i class="fas fa-trash"></i></button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            </div>
+            {% else %}<div class="text-center p-4">لا توجد خطوط سير</div>{% endif %}
+        </div>
+    </div>
+</div>
+<div class="modal" id="addRouteModal">
+    <div class="modal-content" style="max-width:700px">
+        <form method="POST" action="{{ url_for('employee_transport.add_route') }}">
+        <div class="modal-header"><h3>إضافة خط سير</h3><button type="button" class="modal-close" onclick="closeModal('addRouteModal')">&times;</button></div>
+        <div class="modal-body">
+            <div class="row">
+                <div class="col-6"><label>الاسم</label><input name="name" class="form-control" required></div>
+                <div class="col-6"><label>المنطقة</label><input name="area" class="form-control"></div>
+            </div>
+            <div class="row mt-2">
+                <div class="col-6"><label>وقت الانطلاق</label><input name="departure_time" type="time" class="form-control" value="08:00"></div>
+                <div class="col-6"><label>وقت العودة</label><input name="return_time" type="time" class="form-control" value="17:00"></div>
+            </div>
+            <label class="mt-2">ملاحظات</label><textarea name="notes" class="form-control" rows="2"></textarea>
+        </div>
+        <div class="modal-footer"><button type="submit" class="btn btn-primary">حفظ</button></div>
+        </form>
+    </div>
+</div>
+{% for r in routes %}
+<div class="modal" id="editRouteModal{{ r.id }}">
+    <div class="modal-content" style="max-width:700px">
+        <form method="POST" action="{{ url_for('employee_transport.edit_route', id=r.id) }}">
+        <div class="modal-header"><h3>تعديل {{ r.name }}</h3><button type="button" class="modal-close" onclick="closeModal('editRouteModal{{ r.id }}')">&times;</button></div>
+        <div class="modal-body">
+            <div class="row">
+                <div class="col-6"><label>الاسم</label><input name="name" class="form-control" value="{{ r.name }}" required></div>
+                <div class="col-6"><label>المنطقة</label><input name="area" class="form-control" value="{{ r.area or '' }}"></div>
+            </div>
+            <div class="row mt-2">
+                <div class="col-6"><label>وقت الانطلاق</label><input name="departure_time" type="time" class="form-control" value="{{ r.departure_time.strftime('%H:%M') }}"></div>
+                <div class="col-6"><label>وقت العودة</label><input name="return_time" type="time" class="form-control" value="{{ r.return_time.strftime('%H:%M') }}"></div>
+            </div>
+            <label class="mt-2">الحالة</label>
+            <select name="status" class="form-control"><option value="active" {{ 'selected' if r.status=='active' }}>نشط</option><option value="inactive" {{ 'selected' if r.status=='inactive' }}>غير نشط</option></select>
+            <label class="mt-2">ملاحظات</label><textarea name="notes" class="form-control" rows="2">{{ r.notes or '' }}</textarea>
+        </div>
+        <div class="modal-footer"><button type="submit" class="btn btn-primary">تحديث</button></div>
+        </form>
+    </div>
+</div>
+{% endfor %}
+<script>
+function toggleCol(cb) {
+    var col = cb.getAttribute('data-col');
+    document.querySelectorAll('[data-col="'+col+'"]').forEach(function(el) {
+        el.style.display = cb.checked ? '' : 'none';
+    });
+    var prefs = JSON.parse(localStorage.getItem('et_route_cols') || '{}');
+    prefs[col] = cb.checked;
+    localStorage.setItem('et_route_cols', JSON.stringify(prefs));
+}
+(function loadColPrefs() {
+    var prefs = JSON.parse(localStorage.getItem('et_route_cols') || '{}');
+    document.querySelectorAll('.col-toggle').forEach(function(cb) {
+        var col = cb.getAttribute('data-col');
+        if (prefs[col] !== undefined) cb.checked = prefs[col];
+        toggleCol(cb);
+    });
+})();
+document.addEventListener('click', function(e) {
+    var dd = document.getElementById('colToggle');
+    if (dd && dd.style.display !== 'none' && !e.target.closest('.dropdown')) dd.style.display = 'none';
+});
+</script>
+{% endblock %}

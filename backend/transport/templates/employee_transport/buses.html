@@ -1,0 +1,77 @@
+{% extends 'base.html' %}
+{% block title %}الباصات - الگھیث للنقليات{% endblock %}
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4><i class="fas fa-bus"></i> الباصات</h4>
+        <button class="btn btn-primary btn-sm" onclick="openModal('addBusModal')"><i class="fas fa-plus"></i> إضافة باص</button>
+    </div>
+    <div class="card">
+        <div class="card-body p-0">
+            {% if buses %}
+            <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead><tr><th>#</th><th>رقم اللوحة</th><th>السعة</th><th>الموديل</th><th>اللون</th><th>الحالة</th><th>الإجراءات</th></tr></thead>
+                <tbody>
+                {% for b in buses %}
+                <tr>
+                    <td>{{ b.id }}</td>
+                    <td><strong>{{ b.plate_number }}</strong></td>
+                    <td>{{ b.capacity }}</td>
+                    <td>{{ b.model or '-' }}</td>
+                    <td>{{ b.color or '-' }}</td>
+                    <td><span class="badge bg-{{ 'success' if b.status == 'active' else 'danger' }}">{{ b.status }}</span></td>
+                    <td>
+                        <button class="btn btn-warning btn-sm" onclick="openModal('editBusModal{{ b.id }}')"><i class="fas fa-edit"></i></button>
+                        <form action="{{ url_for('employee_transport.delete_bus', id=b.id) }}" method="POST" style="display:inline">
+                            <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('حذف الباص {{ b.plate_number }}؟')"><i class="fas fa-trash"></i></button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            </div>
+            {% else %}<div class="text-center p-4">لا توجد باصات</div>{% endif %}
+        </div>
+    </div>
+</div>
+<div class="modal" id="addBusModal">
+    <div class="modal-content">
+        <form method="POST" action="{{ url_for('employee_transport.add_bus') }}">
+        <div class="modal-header"><h3>إضافة باص</h3><button type="button" class="modal-close" onclick="closeModal('addBusModal')">&times;</button></div>
+        <div class="modal-body">
+            <label>رقم اللوحة</label><input name="plate_number" class="form-control" required>
+            <div class="row mt-2">
+                <div class="col-6"><label>السعة</label><input name="capacity" type="number" class="form-control" value="30"></div>
+                <div class="col-6"><label>اللون</label><input name="color" class="form-control"></div>
+            </div>
+            <label class="mt-2">الموديل</label><input name="model" class="form-control">
+            <label class="mt-2">ملاحظات</label><textarea name="notes" class="form-control" rows="2"></textarea>
+        </div>
+        <div class="modal-footer"><button type="submit" class="btn btn-primary">حفظ</button></div>
+        </form>
+    </div>
+</div>
+{% for b in buses %}
+<div class="modal" id="editBusModal{{ b.id }}">
+    <div class="modal-content">
+        <form method="POST" action="{{ url_for('employee_transport.edit_bus', id=b.id) }}">
+        <div class="modal-header"><h3>تعديل الباص {{ b.plate_number }}</h3><button type="button" class="modal-close" onclick="closeModal('editBusModal{{ b.id }}')">&times;</button></div>
+        <div class="modal-body">
+            <label>رقم اللوحة</label><input name="plate_number" class="form-control" value="{{ b.plate_number }}" required>
+            <div class="row mt-2">
+                <div class="col-6"><label>السعة</label><input name="capacity" type="number" class="form-control" value="{{ b.capacity }}"></div>
+                <div class="col-6"><label>اللون</label><input name="color" class="form-control" value="{{ b.color or '' }}"></div>
+            </div>
+            <label class="mt-2">الموديل</label><input name="model" class="form-control" value="{{ b.model or '' }}">
+            <label class="mt-2">الحالة</label>
+            <select name="status" class="form-control"><option value="active" {{ 'selected' if b.status=='active' }}>نشط</option><option value="inactive" {{ 'selected' if b.status=='inactive' }}>غير نشط</option></select>
+            <label class="mt-2">ملاحظات</label><textarea name="notes" class="form-control" rows="2">{{ b.notes or '' }}</textarea>
+        </div>
+        <div class="modal-footer"><button type="submit" class="btn btn-primary">تحديث</button></div>
+        </form>
+    </div>
+</div>
+{% endfor %}
+{% endblock %}

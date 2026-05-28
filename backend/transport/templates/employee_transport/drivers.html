@@ -1,0 +1,91 @@
+{% extends 'base.html' %}
+{% block title %}السائقين - الگھیث للنقليات{% endblock %}
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4><i class="fas fa-user-clock"></i> السائقين</h4>
+        <button class="btn btn-primary btn-sm" onclick="openModal('addDriverModal')"><i class="fas fa-plus"></i> إضافة سائق</button>
+    </div>
+    <div class="card">
+        <div class="card-body p-0">
+            {% if drivers %}
+            <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead><tr><th>#</th><th>الاسم</th><th>رقم الهاتف</th><th>رخصة القيادة</th><th>موظف</th><th>حساب الدخول</th><th>الحالة</th><th>الإجراءات</th></tr></thead>
+                <tbody>
+                {% for d in drivers %}
+                <tr>
+                    <td>{{ d.id }}</td>
+                    <td><strong>{{ d.name }}</strong></td>
+                    <td>{{ d.phone or '-' }}</td>
+                    <td>{{ d.license_number or '-' }}</td>
+                    <td>{% if d.employee %}{{ d.employee.name }}{% else %}-{% endif %}</td>
+                    <td>{% if d.user_id %}<span class="badge bg-success"><i class="fas fa-check"></i> {{ d.username }}</span>{% else %}<span class="badge bg-secondary">بدون</span>{% endif %}</td>
+                    <td><span class="badge bg-{{ 'success' if d.status == 'active' else 'danger' }}">{{ d.status }}</span></td>
+                    <td>
+                        <button class="btn btn-warning btn-sm" onclick="openModal('editDriverModal{{ d.id }}')"><i class="fas fa-edit"></i></button>
+                        <form action="{{ url_for('employee_transport.delete_driver', id=d.id) }}" method="POST" style="display:inline">
+                            <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('حذف السائق {{ d.name }}؟')"><i class="fas fa-trash"></i></button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            </div>
+            {% else %}<div class="text-center p-4">لا توجد سائقين</div>{% endif %}
+        </div>
+    </div>
+</div>
+<div class="modal" id="addDriverModal">
+    <div class="modal-content">
+        <form method="POST" action="{{ url_for('employee_transport.add_driver') }}">
+        <div class="modal-header"><h3>إضافة سائق</h3><button type="button" class="modal-close" onclick="closeModal('addDriverModal')">&times;</button></div>
+        <div class="modal-body">
+            <label>الاسم</label><input name="name" class="form-control" required>
+            <div class="row mt-2">
+                <div class="col-6"><label>رقم الهاتف</label><input name="phone" class="form-control"></div>
+                <div class="col-6"><label>رخصة القيادة</label><input name="license_number" class="form-control"></div>
+            </div>
+            <label class="mt-2">ربط بموظف</label>
+            <select name="employee_id" class="form-control"><option value="">-- غير مرتبط --</option>{% for e in employees %}<option value="{{ e.id }}">{{ e.name }}</option>{% endfor %}</select>
+            <hr><h6>حساب دخول السائق</h6>
+            <div class="row">
+                <div class="col-6"><label>اسم المستخدم</label><input name="username" class="form-control" placeholder="اختياري"></div>
+                <div class="col-6"><label>كلمة المرور</label><input name="password" type="password" class="form-control" placeholder="اختياري"></div>
+            </div>
+            <label class="mt-2">ملاحظات</label><textarea name="notes" class="form-control" rows="2"></textarea>
+        </div>
+        <div class="modal-footer"><button type="submit" class="btn btn-primary">حفظ</button></div>
+        </form>
+    </div>
+</div>
+{% for d in drivers %}
+<div class="modal" id="editDriverModal{{ d.id }}">
+    <div class="modal-content">
+        <form method="POST" action="{{ url_for('employee_transport.edit_driver', id=d.id) }}">
+        <div class="modal-header"><h3>تعديل السائق {{ d.name }}</h3><button type="button" class="modal-close" onclick="closeModal('editDriverModal{{ d.id }}')">&times;</button></div>
+        <div class="modal-body">
+            <label>الاسم</label><input name="name" class="form-control" value="{{ d.name }}" required>
+            <div class="row mt-2">
+                <div class="col-6"><label>رقم الهاتف</label><input name="phone" class="form-control" value="{{ d.phone or '' }}"></div>
+                <div class="col-6"><label>رخصة القيادة</label><input name="license_number" class="form-control" value="{{ d.license_number or '' }}"></div>
+            </div>
+            <label class="mt-2">ربط بموظف</label>
+            <select name="employee_id" class="form-control"><option value="">-- غير مرتبط --</option>{% for e in employees %}<option value="{{ e.id }}" {{ 'selected' if d.employee_id == e.id }}>{{ e.name }}</option>{% endfor %}</select>
+            <hr><h6>حساب دخول السائق</h6>
+            {% if d.user_id %}<small class="text-success">لديه حساب: {{ d.username or d.user.username }}</small>{% endif %}
+            <div class="row">
+                <div class="col-6"><label>اسم المستخدم</label><input name="username" class="form-control" value="{{ d.username or '' }}" placeholder="اختياري"></div>
+                <div class="col-6"><label>كلمة المرور</label><input name="password" type="password" class="form-control" placeholder="اتركه فارغاً لإبقاء القديمة"></div>
+            </div>
+            <label class="mt-2">الحالة</label>
+            <select name="status" class="form-control"><option value="active" {{ 'selected' if d.status=='active' }}>نشط</option><option value="inactive" {{ 'selected' if d.status=='inactive' }}>غير نشط</option></select>
+            <label class="mt-2">ملاحظات</label><textarea name="notes" class="form-control" rows="2">{{ d.notes or '' }}</textarea>
+        </div>
+        <div class="modal-footer"><button type="submit" class="btn btn-primary">تحديث</button></div>
+        </form>
+    </div>
+</div>
+{% endfor %}
+{% endblock %}

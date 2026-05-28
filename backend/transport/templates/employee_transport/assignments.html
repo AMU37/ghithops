@@ -1,0 +1,192 @@
+{% extends 'base.html' %}
+{% block title %}تقرير الموظفين - الگھیث للنقليات{% endblock %}
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+        <h4><i class="fas fa-users"></i> تقرير الموظفين على خطوط السير</h4>
+        <div class="d-flex gap-2 flex-wrap">
+            <div class="dropdown" style="position:relative">
+                <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" onclick="var d=document.getElementById('colToggle');d.style.display=d.style.display=='none'?'block':'none'">
+                    <i class="fas fa-table-cells"></i> تخصيص الأعمدة
+                </button>
+                <div id="colToggle" style="max-height:300px;overflow-y:auto;min-width:200px;display:none;position:absolute;right:0;z-index:1000;background:#fff;border:1px solid #ddd;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,.15);padding:8px">
+                    {% for key, label in [('id','#'),('code','الكود'),('employee','الموظف'),('company','الشركة'),('department','القسم'),('shift_type','نوع الدوام'),('today_status','حالة اليوم'),('route','خط السير'),('city','المدينة'),('arrival','وقت الوصول'),('departure','وقت الانصراف'),('work_type','نظام العمل')] %}
+                    <label style="display:block;padding:4px 8px;cursor:pointer;white-space:nowrap">
+                        <input type="checkbox" class="col-toggle" data-col="{{ key }}" {{ 'checked' if key in ('employee','company','shift_type','today_status','route') else '' }} onchange="toggleCol(this)">
+                        {{ label }}
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+            <button class="btn btn-success btn-sm" onclick="exportExcel()"><i class="fas fa-file-excel"></i> إكسيل</button>
+            <button class="btn btn-danger btn-sm" onclick="exportPDF()"><i class="fas fa-file-pdf"></i> PDF</button>
+        </div>
+    </div>
+<form method="GET"
+      class="d-flex flex-nowrap align-items-end gap-2 overflow-auto">
+
+    <div>
+        <label class="small">نوع الدوام</label>
+        <select name="shift_type"
+                class="form-control form-control-sm"
+                onchange="this.form.submit()">
+            <option value="">الكل</option>
+            {% for st in shift_types %}
+            <option value="{{ st.id }}"
+                {{ 'selected' if request.args.get('shift_type')|string==st.id|string }}>
+                {{ st.name }}
+            </option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div>
+        <label class="small">حالة اليوم</label>
+        <select name="today_status"
+                class="form-control form-control-sm"
+                onchange="this.form.submit()">
+            <option value="">الكل</option>
+            <option value="arriving">قادم</option>
+            <option value="working">مداوم</option>
+            <option value="departing">مغادر</option>
+        </select>
+    </div>
+
+    <div>
+        <label class="small">خط السير</label>
+        <select name="route_id"
+                class="form-control form-control-sm"
+                onchange="this.form.submit()">
+            <option value="">الكل</option>
+        </select>
+    </div>
+
+    <div>
+        <label class="small">التاريخ</label>
+        <input type="date"
+               name="report_date"
+               class="form-control form-control-sm">
+    </div>
+
+    <div>
+        <a href="{{ url_for('employee_transport.assignments') }}"
+           class="btn btn-outline-secondary btn-sm">
+            إعادة تعيين
+        </a>
+    </div>
+
+</form>
+    <!-- Report actions -->
+    <div class="mb-2 d-flex gap-2 align-items-center flex-wrap">
+        <button class="btn btn-primary" onclick="transferToTrips()"><i class="fas fa-calendar-day"></i> ترحيل المفلتر إلى الرحلات</button>
+        {% if infos %}
+        <span class="text-muted small"><i class="fas fa-users"></i> إجمالي: {{ infos|length }} موظف</span>
+        {% endif %}
+    </div>
+
+    <!-- Table -->
+    <div class="card">
+        <div class="card-body p-0">
+            {% if infos %}
+            <div class="table-responsive" style="overflow-x:auto">
+            <table class="table table-hover mb-0" id="reportTable">
+                <thead><tr>
+                    <th data-col="id">#</th><th data-col="code">الكود</th><th data-col="employee">الموظف</th>
+                    <th data-col="company">الشركة</th><th data-col="department">القسم</th>
+                    <th data-col="shift_type">نوع الدوام</th><th data-col="today_status">حالة اليوم</th>
+                    <th data-col="route">خط السير</th><th data-col="city">المدينة</th>
+                    <th data-col="arrival">وقت الوصول</th><th data-col="departure">وقت الانصراف</th>
+                    <th data-col="work_type">نظام العمل</th>
+                </tr></thead>
+                <tbody>
+                {% for info in infos %}
+                {% set cs = cycle_statuses.get(info.employee_id) %}
+                {% set emp = info.employee %}
+                <tr>
+                    <td data-col="id">{{ info.id }}</td>
+                    <td data-col="code">{{ emp.code if emp else '-' }}</td>
+                    <td data-col="employee" data-employee-id="{{ emp.id if emp else '' }}"><strong>{{ emp.name if emp else '-' }}</strong></td>
+                    <td data-col="company">{{ emp.company.name if emp and emp.company else info.external_company or '-' }}</td>
+                    <td data-col="department">{{ info.department or '-' }}</td>
+                    <td data-col="shift_type">{{ info.shift_type.name if info.shift_type else '-' }}</td>
+                    <td data-col="today_status">
+                        {% if cs %}
+                        <span class="badge bg-{{ cs.color }}">{{ cs.label }}</span>
+                        {% else %}<span class="badge bg-secondary">-</span>{% endif %}
+                    </td>
+                    <td data-col="route">{{ info.route.name if info.route else '-' }}</td>
+                    <td data-col="city">{{ info.city or '-' }}</td>
+                    <td data-col="arrival">{{ info.arrival_time.strftime('%H:%M') if info.arrival_time else '-' }}</td>
+                    <td data-col="departure">{{ info.departure_time.strftime('%H:%M') if info.departure_time else '-' }}</td>
+                    <td data-col="work_type">{{ info.transport_type or 'ورديات' }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            </div>
+            {% else %}<div class="text-center p-4">لا يوجد موظفين{% if request.args %} مطابقين للفلتر{% endif %}</div>{% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+function toggleCol(cb) {
+    var col = cb.getAttribute('data-col');
+    document.querySelectorAll('[data-col="'+col+'"]').forEach(function(el) {
+        el.style.display = cb.checked ? '' : 'none';
+    });
+    var prefs = JSON.parse(localStorage.getItem('et_rpt_cols') || '{}');
+    prefs[col] = cb.checked;
+    localStorage.setItem('et_rpt_cols', JSON.stringify(prefs));
+}
+(function loadPrefs() {
+    var prefs = JSON.parse(localStorage.getItem('et_rpt_cols') || '{}');
+    document.querySelectorAll('.col-toggle').forEach(function(cb) {
+        var col = cb.getAttribute('data-col');
+        if (prefs[col] !== undefined) cb.checked = prefs[col];
+        toggleCol(cb);
+    });
+})();
+document.addEventListener('click', function(e) {
+    var dd = document.getElementById('colToggle');
+    if (dd && dd.style.display !== 'none' && !e.target.closest('.dropdown')) dd.style.display = 'none';
+});
+
+function transferToTrips() {
+    if (!confirm('ترحيل الموظفين الظاهرين إلى جدول رحلات اليوم؟')) return;
+    var data = [];
+    var date = document.querySelector('[name="report_date"]')?.value || '';
+    document.querySelectorAll('#reportTable tbody tr').forEach(function(tr) {
+        if (tr.style.display !== 'none') {
+            var route = tr.querySelector('[data-col="route"]')?.innerText.trim() || '';
+            var empTd = tr.querySelector('[data-col="employee"]');
+            var emp = empTd?.innerText.trim() || '';
+            var empId = empTd?.getAttribute('data-employee-id') || '';
+            if (route && route !== '-' && empId) data.push(empId + '|' + emp + '|' + route);
+        }
+    });
+    fetch('/employee-transport/assignments/transfer-to-trips', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({rows: data, date: date})
+    }).then(r => r.json()).then(d => {
+        if (d.success) { alert(d.message); window.location.href = '/employee-transport/trips?date=' + (d.date || ''); }
+        else { alert('خطأ: ' + d.message); }
+    });
+}
+function exportExcel() {
+    var table = document.getElementById('reportTable');
+    if (!table) return;
+    var html = '<table>' + table.outerHTML + '</table>';
+    var blob = new Blob(['\uFEFF' + html], {type:'application/vnd.ms-excel'});
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'تقرير_الموظفين_' + new Date().toISOString().slice(0,10) + '.xls';
+    a.click();
+}
+function exportPDF() { window.print(); }
+</script>
+<style>
+@media print { .btn, form, .modal, .dropdown { display:none!important; } }
+</style>
+{% endblock %}

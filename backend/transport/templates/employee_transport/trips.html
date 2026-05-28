@@ -1,0 +1,164 @@
+{% extends 'base.html' %}
+{% block title %}رحلات اليوم - الگھیث للنقليات{% endblock %}
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4><i class="fas fa-calendar-day"></i> رحلات {{ trip_date }}</h4>
+        <form class="d-flex gap-2 align-items-center" method="GET">
+            <input type="date" name="date" class="form-control form-control-sm" value="{{ trip_date }}" onchange="this.form.submit()">
+            <a href="{{ url_for('employee_transport.trips') }}" class="btn btn-outline-primary btn-sm">اليوم</a>
+            <div class="form-check form-check-inline mb-0">
+                <input class="form-check-input" type="checkbox" id="showArchived" name="show_archived" value="1" {{ 'checked' if show_archived }} onchange="this.form.submit()">
+                <label class="form-check-label small" for="showArchived">المؤرشف</label>
+            </div>
+            <button type="button" class="btn btn-outline-success btn-sm" id="mergeBtn" style="display:none" onclick="mergeTrips()"><i class="fas fa-object-group"></i> دمج المختارة</button>
+            {% if trips %}
+            <button type="button" class="btn btn-outline-danger btn-sm" onclick="if(confirm('مسح كل رحلات {{ trip_date }}؟')){var f=document.createElement('form');f.method='POST';f.action='{{ url_for('employee_transport.clear_trips') }}';var i=document.createElement('input');i.name='date';i.value='{{ trip_date }}';f.appendChild(i);document.body.appendChild(f);f.submit();}"><i class="fas fa-trash"></i> مسح الكل</button>
+            {% endif %}
+        </form>
+    </div>
+
+    {% if trips %}
+    {% for t in trips %}
+    {% set emp_list = trip_employees.get(t.id, []) %}
+    {% set t_routes = trip_routes_map.get(t.id, []) %}
+    {% set bs = bus_suggestions.get(t.id, {}) %}
+    <div class="card mb-3 trip-card" data-trip-id="{{ t.id }}">
+        <div class="card-header d-flex justify-content-between align-items-center py-2">
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <input type="checkbox" class="trip-select" data-trip-id="{{ t.id }}" onchange="toggleMergeBtn()">
+                <strong><i class="fas fa-route"></i> {{ t_routes|join(' + ') }}</strong>
+                <span class="badge bg-info" style="font-size:11px">{{ emp_list|length }} موظف</span>
+                <small class="text-muted"><i class="fas fa-clock"></i> {{ t.departure_time.strftime('%H:%M') if t.departure_time else '-' }} → {{ t.return_time.strftime('%H:%M') if t.return_time else '-' }}</small>
+            </div>
+            <span class="badge bg-{{ 'secondary' if t.status == 'scheduled' else 'primary' if t.status == 'in_progress' else 'success' }}" style="font-size:12px">{{ t.status }}</span>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+            <table class="table table-sm mb-0">
+                <thead>
+                    <tr class="small text-muted">
+                        <th style="width:40px">#</th>
+                        <th>الموظف</th>
+                        <th style="width:100px">القسم</th>
+                        <th style="width:80px">الحالة</th>
+                        <th style="width:80px">وقت الوصول</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for e in emp_list %}
+                    <tr>
+                        <td>{{ loop.index }}</td>
+                        <td>{{ e.name }}</td>
+                        <td>{{ e.department or '-' }}</td>
+                        <td><span class="badge bg-{{ e.status_color }}" style="font-size:10px">{{ e.status }}</span></td>
+                        <td>{{ e.arrival or '-' }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="5" class="text-center text-muted py-2">لا يوجد موظفين</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            </div>
+        </div>
+        <div class="card-footer py-2">
+            <div class="row g-2 align-items-end">
+                {% if t.status == 'scheduled' %}
+                <form method="POST" action="{{ url_for('employee_transport.assign_trip_resources', id=t.id) }}" class="row g-2 align-items-end">
+                    <div class="col-md-3">
+                        <label class="small text-muted mb-1">الباص</label>
+                        <select name="bus_id" class="form-control form-control-sm">
+                            <option value="">-- اختر باص --</option>
+                            {% for b in buses %}<option value="{{ b.id }}" {{ 'selected' if t.bus_id == b.id }}>{{ b.plate_number }}{% if b.capacity %} ({{ b.capacity }}){% endif %}</option>{% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="small text-muted mb-1">السائق</label>
+                        <select name="driver_id" class="form-control form-control-sm">
+                            <option value="">-- اختر سائق --</option>
+                            {% for d in drivers %}<option value="{{ d.id }}" {{ 'selected' if t.driver_id == d.id }}>{{ d.name }}</option>{% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3 d-flex gap-1">
+                        <button type="submit" class="btn btn-sm {{ 'btn-success' if t.bus_id and t.driver_id else 'btn-primary' }}">
+                            <i class="fas fa-check"></i> {{ 'تحديث' if t.bus_id and t.driver_id else 'ترحيل للسائق' }}
+                        </button>
+                    </div>
+                    <div class="col-md-3 text-end">
+                        <button type="button" class="btn btn-sm btn-outline-info" onclick="loadTripEmployees({{ t.id }})">
+                            <i class="fas fa-users"></i> سجل الركاب
+                        </button>
+                    </div>
+                </form>
+                <div id="trip-{{ t.id }}-employees" class="mt-2" style="display:none">
+                    <div class="text-center p-2"><small class="text-muted">جاري التحميل...</small></div>
+                </div>
+                {% elif t.status == 'in_progress' %}
+                <div class="d-flex gap-2">
+                    <form action="{{ url_for('employee_transport.complete_trip', id=t.id) }}" method="POST">
+                        <button class="btn btn-success btn-sm"><i class="fas fa-check"></i> إكمال الرحلة</button>
+                    </form>
+                    <button type="button" class="btn btn-sm btn-outline-info" onclick="loadTripEmployees({{ t.id }})">
+                        <i class="fas fa-users"></i> سجل الركاب
+                    </button>
+                </div>
+                <div id="trip-{{ t.id }}-employees" class="mt-2" style="display:none">
+                    <div class="text-center p-2"><small class="text-muted">جاري التحميل...</small></div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="alert alert-info d-flex justify-content-between align-items-center">
+        <span>لا توجد رحلات لهذا التاريخ</span>
+        <a href="{{ url_for('employee_transport.assignments') }}" class="btn btn-primary btn-sm"><i class="fas fa-calendar-day"></i> الذهاب للتقرير وترحيل الموظفين</a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function loadTripEmployees(tripId) {
+    const div = document.getElementById('trip-' + tripId + '-employees');
+    if (div.style.display === 'none' || div.style.display === '') {
+        div.style.display = 'block';
+        fetch('/employee-transport/trip/employees/' + tripId)
+            .then(r => r.json()).then(data => {
+                let html = '<table class="table table-sm mb-0"><tr><th>الموظف</th><th>الإجراء</th><th>الوقت</th><th>الحالة</th></tr>';
+                if (data.logs.length === 0) {
+                    html += '<tr><td colspan="4" class="text-center">لا يوجد ركاب</td></tr>';
+                } else {
+                    data.logs.forEach(l => {
+                        var actionMap = {'assigned':'معين','board':'ركوب','alight':'نزول'};
+                        html += '<tr><td>' + l.employee + '</td><td>' + (actionMap[l.action]||l.action) + '</td><td>' + l.time + '</td><td>' + l.status + '</td></tr>';
+                    });
+                }
+                html += '</table><small class="text-muted">إجمالي المعينين: ' + data.total_assigned + '</small>';
+                div.innerHTML = html;
+            }).catch(e => { div.innerHTML = '<div class="text-danger">خطأ في التحميل</div>'; });
+    } else {
+        div.style.display = 'none';
+    }
+}
+function toggleMergeBtn() {
+    var checked = document.querySelectorAll('.trip-select:checked');
+    document.getElementById('mergeBtn').style.display = checked.length >= 2 ? 'inline-block' : 'none';
+}
+function mergeTrips() {
+    var checked = document.querySelectorAll('.trip-select:checked');
+    if (checked.length < 2) return;
+    var ids = Array.from(checked).map(c => parseInt(c.getAttribute('data-trip-id')));
+    if (!confirm('دمج ' + checked.length + ' رحلة في رحلة واحدة؟')) return;
+    fetch('/employee-transport/trips/merge', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({trip_ids: ids})
+    }).then(r => r.json()).then(d => {
+        if (d.success) { alert(d.message); location.reload(); }
+        else { alert('خطأ: ' + d.message); }
+    });
+}
+</script>
+{% endblock %}

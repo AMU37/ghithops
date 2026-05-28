@@ -1,0 +1,403 @@
+{% extends 'base.html' %}
+{% block title %}واجهة السائق - الگھیث للنقليات{% endblock %}
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4><i class="fas fa-user-cog"></i> واجهة السائق</h4>
+        <span class="text-muted">{{ today }}</span>
+    </div>
+
+    <!-- Driver & Trip selector -->
+    {% if current_driver %}
+    <div class="mb-2">
+        <span class="badge bg-info fs-6">{{ current_driver.name }}</span>
+        {% for t in trips %}
+        <button class="btn btn-sm {{ 'btn-primary' if loop.first else 'btn-outline-secondary' }} trip-tab-btn" data-trip="{{ t.id }}" onclick="switchTrip({{ t.id }})">
+            {{ t.route.name if t.route else '-' }}{% for tr in (t.trip_routes or []) %}{% if tr.route %} + {{ tr.route.name }}{% endif %}{% endfor %}
+        </button>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Tabs -->
+    <ul class="nav nav-tabs mb-3">
+        <li class="nav-item">
+            <a class="nav-link active" href="#" onclick="switchView('manifest', this); return false;"><i class="fas fa-list"></i> الكشف</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" href="#" onclick="switchView('entry', this); return false;"><i class="fas fa-bus"></i> تسجيل الدخول</a>
+        </li>
+    </ul>
+
+    <!-- ===== TAB 1: MANIFEST ===== -->
+    <div id="view-manifest" class="view-panel">
+        <div class="row">
+            <div class="col-md-8">
+                {% for t in trips %}
+                {% set te = trip_employees.get(t.id, {}) %}
+                {% set emps = te.get('employees', []) %}
+                <div class="card mb-3 trip-panel" data-trip="{{ t.id }}" {% if not loop.first %}style="display:none"{% endif %}>
+                    <div class="card-header d-flex justify-content-between align-items-center py-2">
+                        <div>
+                            <strong>{{ t.route.name if t.route else '-' }}{% for tr in (t.trip_routes or []) %}{% if tr.route %} + {{ tr.route.name }}{% endif %}{% endfor %}</strong>
+                            <small class="text-muted me-2">{{ t.departure_time.strftime('%H:%M') if t.departure_time else '-' }} → {{ t.return_time.strftime('%H:%M') if t.return_time else '-' }}</small>
+                            <span class="badge bg-{{ 'secondary' if t.status == 'scheduled' else 'primary' if t.status == 'in_progress' else 'success' }}">{{ t.status }}</span>
+                        </div>
+                        <div class="d-flex gap-1 align-items-center">
+                            <span class="badge bg-info">{{ te.total_assigned }} معين</span>
+                            <span class="badge bg-success">{{ te.total_boarded }} صاعد</span>
+                            <button class="btn btn-outline-primary btn-sm" onclick="loadRiders({{ t.id }})"><i class="fas fa-sync"></i></button>
+                            {% if current_driver %}
+                                {% if t.status == 'scheduled' %}&nbsp;<form action="{{ url_for('employee_transport.start_trip', id=t.id) }}" method="POST" class="d-inline" style="margin:0;padding:0"><button class="btn btn-primary btn-sm"><i class="fas fa-play"></i></button></form>{% endif %}
+                                {% if t.status == 'in_progress' %}&nbsp;<form action="{{ url_for('employee_transport.complete_trip', id=t.id) }}" method="POST" onsubmit="return confirm('إكمال الرحلة؟ سيتم إغلاق التسجيل.')" class="d-inline" style="margin:0;padding:0"><button class="btn btn-success btn-sm"><i class="fas fa-check-double"></i></button></form>{% endif %}
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="card-body p-0">
+                        {% if emps %}
+                        <div style="max-height:400px;overflow-y:auto">
+                            <table class="table table-sm table-bordered mb-0" style="font-size:12px">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>#</th>
+                                        <th>الكود</th>
+                                        <th>الاسم</th>
+                                        <th>الوظيفة</th>
+                                        <th>الإدارة</th>
+                                        <th>الشركة</th>
+                                        <th>نوع الدوام</th>
+                                        <th>اليوم</th>
+                                        <th>تاريخ الدوام</th>
+                                        <th>حالة اليوم</th>
+                                        <th>الصعود</th>
+                                        <th>الحالة النهائية</th>
+                                        <th>ملاحظات</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                {% for e in emps %}
+                                    <tr class="{{ 'table-warning' if e.route_mismatch and e.boarded else 'table-success' if e.boarded }}">
+                                        <td>{{ loop.index }}</td>
+                                        <td>{{ e.code }}</td>
+                                        <td>{{ e.name }}</td>
+                                        <td>{{ e.job }}</td>
+                                        <td>{{ e.department }}</td>
+                                        <td>{{ e.company }}</td>
+                                        <td>{{ e.shift_type }}</td>
+                                        <td>{{ e.work_day }}</td>
+                                        <td>{{ e.work_date }}</td>
+                                        <td><span class="badge bg-{{ e.status_color }}" style="font-size:10px">{{ e.today_status }}</span></td>
+                                        <td>{% if e.boarded %}<i class="fas fa-check text-success"></i>{% else %}<i class="fas fa-times text-muted"></i>{% endif %}</td>
+                                        <td><span class="badge bg-{{ e.final_color }}">{{ e.final_status }}</span></td>
+                                        <td>{% if e.route_mismatch %}<small class="text-warning"><i class="fas fa-exclamation-triangle"></i> خطه: {{ e.original_route }}</small>{% else %}-{% endif %}</td>
+                                    </tr>
+                                {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <div class="text-center text-muted py-3">لا يوجد موظفين معينين</div>
+                        {% endif %}
+                    </div>
+                    <!-- Boarded employees table -->
+                    <div class="card-footer py-2" id="boardedSection{{ t.id }}">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <small class="text-muted"><i class="fas fa-check-circle text-success"></i> الصاعدون (<span id="boardedCount{{ t.id }}">{{ te.total_boarded }}</span>)</small>
+                            <button class="btn btn-sm btn-outline-info" onclick="loadRiders({{ t.id }})"><i class="fas fa-sync"></i> تحديث</button>
+                        </div>
+                        <div id="riders{{ t.id }}" style="max-height:200px;overflow-y:auto">
+                            {% set boarded_emps = te.get('boarded_employees', []) %}
+                            {% if boarded_emps %}
+                            <table class="table table-sm table-bordered mb-0" style="font-size:11px">
+                                <thead class="table-success">
+                                    <tr>
+                                        <th>#</th>
+                                        <th>الكود</th>
+                                        <th>الاسم</th>
+                                        <th>الوظيفة</th>
+                                        <th>الإدارة</th>
+                                        <th>الشركة</th>
+                                        <th>نوع الدوام</th>
+                                        <th>اليوم</th>
+                                        <th>تاريخ الدوام</th>
+                                        <th>حالة اليوم</th>
+                                        <th>الحالة النهائية</th>
+                                        <th>ملاحظات</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                {% for e in boarded_emps %}
+                                    <tr class="{{ 'table-warning' if e.route_mismatch }}">
+                                        <td>{{ loop.index }}</td>
+                                        <td>{{ e.code }}</td>
+                                        <td><i class="fas fa-check text-success"></i> {{ e.name }}</td>
+                                        <td>{{ e.job }}</td>
+                                        <td>{{ e.department }}</td>
+                                        <td>{{ e.company }}</td>
+                                        <td>{{ e.shift_type }}</td>
+                                        <td>{{ e.work_day }}</td>
+                                        <td>{{ e.work_date }}</td>
+                                        <td><span class="badge bg-{{ e.status_color }}" style="font-size:10px">{{ e.today_status }}</span></td>
+                                        <td><span class="badge bg-{{ e.final_color }}">{{ e.final_status }}</span></td>
+                                        <td>{% if e.route_mismatch %}<small class="text-warning"><i class="fas fa-exclamation-triangle"></i> {{ e.original_route }}</small>{% else %}-{% endif %}</td>
+                                    </tr>
+                                {% endfor %}
+                                </tbody>
+                            </table>
+                            {% else %}
+                            <div class="text-center text-muted py-2"><small>لا يوجد صاعدين بعد</small></div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% else %}
+                <div class="alert alert-info">لا توجد رحلات لليوم</div>
+                {% endfor %}
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">إرشادات</div>
+                    <div class="card-body">
+                        <ul class="mb-0">
+                            <li>مسح الكود أو إدخال اسم الموظف</li>
+                            <li>الموظف غير المدرج في الخطة ← تحذير</li>
+                            <li>الموظف من خط سير آخر ← يظهر في ملاحظات بخط أصفر</li>
+                            <li>الموظف غير الموجود ← إضافة يدوية</li>
+                            <li>عند الوصول لبوابة الشركة اضغط "إكمال الرحلة"</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="card mt-2">
+                    <div class="card-header">آخر العمليات</div>
+                    <div class="card-body" id="recentOperations">
+                        <div class="text-muted text-center">انتظر...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== TAB 2: ENTRY REGISTRATION ===== -->
+    <div id="view-entry" class="view-panel" style="display:none">
+        {% for t in trips %}
+        {% set te = trip_employees.get(t.id, {}) %}
+        {% set emps = te.get('employees', []) %}
+        {% set boarded_count = te.total_boarded %}
+        {% set total_count = te.total_assigned %}
+        <div class="trip-panel" data-trip="{{ t.id }}" {% if not loop.first %}style="display:none"{% endif %}>
+            <!-- Progress -->
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h5 class="mb-0">{{ t.route.name if t.route else '-' }}{% for tr in (t.trip_routes or []) %}{% if tr.route %} + {{ tr.route.name }}{% endif %}{% endfor %}</h5>
+                <div>
+                    <span class="badge bg-success fs-6">{{ boarded_count }}</span>
+                    <span class="text-muted">/</span>
+                    <span class="badge bg-info fs-6">{{ total_count }}</span>
+                    <small class="text-muted ms-1">صاعد</small>
+                </div>
+            </div>
+            <div class="progress mb-3" style="height:8px">
+                <div class="progress-bar bg-success" style="width:{{ ((boarded_count / total_count) * 100)|round if total_count > 0 else 0 }}%"></div>
+            </div>
+
+            <!-- Scan input -->
+            <div class="card mb-3">
+                <div class="card-body p-3">
+                    <div class="input-group input-group-lg mb-2">
+                        <input type="text" class="form-control form-control-lg" id="entryCode{{ t.id }}" placeholder="مسح الكود" autocomplete="off" onkeydown="if(event.key=='Enter')boardFromEntry({{ t.id }},'board')" style="font-size:24px;text-align:center" autofocus>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-success btn-lg flex-fill" onclick="boardFromEntry({{ t.id }}, 'board')" style="font-size:20px"><i class="fas fa-user-plus"></i> صعود</button>
+                        <button class="btn btn-warning btn-lg flex-fill" onclick="boardFromEntry({{ t.id }}, 'disembark')" style="font-size:20px"><i class="fas fa-user-minus"></i> نزول</button>
+                    </div>
+                    <div id="entryResult{{ t.id }}" class="mt-2 text-center" style="min-height:40px"></div>
+                </div>
+            </div>
+
+            <!-- Trip control buttons -->
+            {% if t.status == 'scheduled' %}
+            <form action="{{ url_for('employee_transport.start_trip', id=t.id) }}" method="POST" class="mb-3">
+                <button class="btn btn-primary btn-lg w-100" style="font-size:18px"><i class="fas fa-play"></i> بدء الرحلة</button>
+            </form>
+            {% endif %}
+            {% if t.status == 'in_progress' %}
+            <form action="{{ url_for('employee_transport.complete_trip', id=t.id) }}" method="POST" onsubmit="return confirm('إكمال الرحلة؟ سيتم إغلاق التسجيل وإرسال التقرير النهائي للمشرف.')" class="mb-3">
+                <button class="btn btn-success btn-lg w-100" style="font-size:18px"><i class="fas fa-check-double"></i> إكمال الرحلة - بوابة الشركة</button>
+            </form>
+            {% endif %}
+
+            <!-- Recent boardings -->
+            <div class="card">
+                <div class="card-header py-2">
+                    <small><i class="fas fa-clock"></i> آخر الصاعدين</small>
+                </div>
+                <div class="card-body p-0" id="entryRecent{{ t.id }}" style="max-height:300px;overflow-y:auto">
+                    <div class="text-center text-muted py-3">انتظر...</div>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="alert alert-info">لا توجد رحلات لليوم</div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Manual add modal -->
+<div class="modal" id="manualAddModal">
+    <div class="modal-content" style="max-width:400px">
+        <div class="modal-header">
+            <h5 class="modal-title">إضافة موظف غير موجود</h5>
+            <button type="button" class="btn-close" onclick="closeModal('manualAddModal')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <p class="text-muted small">الموظف " <span id="manualEmpName"></span> " غير موجود في النظام.</p>
+            <div class="mb-2">
+                <label class="small">الاسم</label>
+                <input type="text" class="form-control" id="manualEmpInput">
+            </div>
+            <div class="mb-2">
+                <label class="small">الشركة</label>
+                <input type="text" class="form-control" id="manualEmpCompany">
+            </div>
+            <div class="mb-2">
+                <label class="small">الوظيفة</label>
+                <input type="text" class="form-control" id="manualEmpPosition">
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('manualAddModal')">إلغاء</button>
+            <button class="btn btn-primary" onclick="confirmManualAdd()">إضافة وتسجيل</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+let recentOps = [];
+let pendingManual = {tripId: null, action: null, code: null};
+let currentTripId = null;
+
+function switchView(view, el) {
+    document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+    el.classList.add('active');
+    document.querySelectorAll('.view-panel').forEach(p => p.style.display = 'none');
+    document.getElementById('view-' + view).style.display = '';
+    if (view === 'entry') {
+        var inp = document.querySelector('#view-entry .trip-panel:not([style*=\"none\"]) input');
+        if (inp) setTimeout(() => inp.focus(), 100);
+    }
+}
+
+function switchTrip(tripId) {
+    currentTripId = tripId;
+    document.querySelectorAll('.trip-tab-btn').forEach(b => b.classList.replace('btn-primary', 'btn-outline-secondary'));
+    document.querySelectorAll('.trip-tab-btn[data-trip="' + tripId + '"]').forEach(b => b.classList.replace('btn-outline-secondary', 'btn-primary'));
+    document.querySelectorAll('.trip-panel').forEach(p => {
+        p.style.display = p.getAttribute('data-trip') == tripId ? '' : 'none';
+    });
+    var inp = document.querySelector('.view-panel:not([style*=\"none\"]) .trip-panel:not([style*=\"none\"]) input');
+    if (inp) setTimeout(() => inp.focus(), 100);
+}
+
+// Board from entry tab
+function boardFromEntry(tripId, action) {
+    const input = document.getElementById('entryCode' + tripId);
+    const code = input.value.trim();
+    if (!code) { alert('الرجاء إدخال كود الموظف'); return; }
+    doBoard(tripId, code, action, function() {
+        input.value = '';
+        input.focus();
+        loadEntryRecent(tripId);
+        loadRiders(tripId);
+    });
+}
+
+function doBoard(tripId, code, action, onSuccess) {
+    fetch('/employee-transport/driver/board', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: new URLSearchParams({trip_id: tripId, employee_code: code, action: action})
+    })
+    .then(r => r.json()).then(data => {
+        var el = document.getElementById('entryResult' + tripId);
+        if (data.success) {
+            if (el) {
+                var cls = action === 'board' ? 'text-success' : 'text-warning';
+                el.innerHTML = '<span class="fs-5 ' + cls + '"><i class="fas fa-check-circle"></i> ' + data.message + '</span>';
+                setTimeout(() => el.innerHTML = '', 3000);
+            }
+            addOp(data.message);
+            if (onSuccess) onSuccess();
+            if (data.warning) {
+                alert(data.warning);
+                setTimeout(() => location.reload(), 1500);
+            }
+        } else if (data.not_found) {
+            pendingManual = {tripId: tripId, action: action, code: code};
+            document.getElementById('manualEmpInput').value = code;
+            document.getElementById('manualEmpName').textContent = code;
+            openModal('manualAddModal');
+        } else {
+            if (el) el.innerHTML = '<span class="fs-5 text-danger">' + data.message + '</span>';
+            else alert(data.message);
+        }
+    }).catch(e => alert('خطأ في الاتصال'));
+}
+
+function confirmManualAdd() {
+    const name = document.getElementById('manualEmpInput').value.trim();
+    const company = document.getElementById('manualEmpCompany').value.trim();
+    const position = document.getElementById('manualEmpPosition').value.trim();
+    if (!name) { alert('الرجاء إدخال الاسم'); return; }
+    fetch('/employee-transport/driver/add-manual', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: new URLSearchParams({trip_id: pendingManual.tripId, employee_name: name, action: pendingManual.action, company: company, position: position})
+    })
+    .then(r => r.json()).then(data => {
+        if (data.success) {
+            closeModal('manualAddModal');
+            addOp(data.message);
+            location.reload();
+        } else {
+            alert(data.message);
+        }
+    });
+}
+
+function addOp(msg) {
+    recentOps.unshift(msg + ' - ' + new Date().toLocaleTimeString());
+    if (recentOps.length > 10) recentOps.pop();
+    document.getElementById('recentOperations').innerHTML = recentOps.map(o =>
+        '<div class="border-bottom py-1 small">' + o + '</div>'
+    ).join('');
+}
+
+function loadRiders(tripId) {
+    location.reload();
+}
+
+function loadEntryRecent(tripId) {
+    fetch('/employee-transport/trip/employees/' + tripId)
+    .then(r => r.json()).then(data => {
+        var boards = data.logs.filter(l => l.action === 'board' || l.action === 'disembark').slice(-20).reverse();
+        var el = document.getElementById('entryRecent' + tripId);
+        if (!el) return;
+        if (boards.length === 0) {
+            el.innerHTML = '<div class="text-center text-muted py-3">لا يوجد صاعدين بعد</div>';
+        } else {
+            el.innerHTML = boards.map(l => {
+                var actionMap = {'board':'صعود','disembark':'نزول'};
+                var bg = l.action === 'board' ? 'success' : 'warning';
+                return '<div class="border-bottom px-3 py-2 d-flex justify-content-between"><span>' + l.employee + '</span><span><span class="badge bg-' + bg + '">' + (actionMap[l.action]||l.action) + '</span> <small class="text-muted">' + l.time + '</small></span></div>';
+            }).join('');
+        }
+    }).catch(e => console.error(e));
+}
+
+// Auto-load entry view on first visit
+document.addEventListener('DOMContentLoaded', function() {
+    var firstTrip = document.querySelector('.trip-tab-btn');
+    if (firstTrip) switchTrip(parseInt(firstTrip.getAttribute('data-trip')));
+});
+</script>
+{% endblock %}

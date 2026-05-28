@@ -1,0 +1,6 @@
+{
+  "module": "employee_transport",
+  "purpose": "GhithOps transport department module",
+  "main_blueprint": "et_bp",
+  "placement": "Place under backend package root and register blueprint in app bootstrap"
+}

@@ -1,0 +1,98 @@
+{% extends 'base.html' %}
+{% block title %}أنواع الدوام - الگھیث للنقليات{% endblock %}
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4><i class="fas fa-clock"></i> أنواع الدوام</h4>
+        <button class="btn btn-primary btn-sm" onclick="openModal('addShiftModal')"><i class="fas fa-plus"></i> إضافة</button>
+    </div>
+    <div class="card">
+        <div class="card-body p-0">
+            {% if shift_types %}
+            <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead><tr>
+                    <th>#</th><th>الاسم</th><th>الوصف</th><th>أيام الدوام</th><th>أيام الإجازة</th><th>إجمالي الدورة</th><th>الحالة</th><th>الإجراءات</th>
+                </tr></thead>
+                <tbody>
+                {% for st in shift_types %}
+                <tr>
+                    <td>{{ st.id }}</td>
+                    <td><strong>{{ st.name }}</strong></td>
+                    <td>{{ st.description or '-' }}</td>
+                    <td>{{ st.work_days or 6 }}</td>
+                    <td>{{ st.vacation_days or 1 }}</td>
+                    <td>{{ (st.work_days or 6) + (st.vacation_days or 1) }}</td>
+                    <td><span class="badge bg-{{ 'success' if st.status == 'active' else 'danger' }}">{{ st.status }}</span></td>
+                    <td>
+                        <button class="btn btn-warning btn-sm" onclick="openEditShiftType({{ st.id }})"><i class="fas fa-edit"></i></button>
+                        <form action="{{ url_for('employee_transport.delete_shift_type', id=st.id) }}" method="POST" style="display:inline">
+                            <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('حذف {{ st.name }}؟')"><i class="fas fa-trash"></i></button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            {% else %}<div class="text-center p-4">لا توجد أنواع دوام</div>{% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="modal" id="addShiftModal">
+    <div class="modal-content">
+        <form method="POST" action="{{ url_for('employee_transport.add_shift_type') }}">
+        <div class="modal-header"><h3>إضافة نوع دوام</h3><button type="button" class="modal-close" onclick="closeModal('addShiftModal')">&times;</button></div>
+        <div class="modal-body">
+            <label>الاسم</label><input name="name" class="form-control" required>
+            <label class="mt-2">الوصف</label><textarea name="description" class="form-control" rows="2"></textarea>
+            <div class="row mt-2">
+                <div class="col-6"><label>أيام الدوام</label><input type="number" name="work_days" class="form-control" value="6" min="1" required></div>
+                <div class="col-6"><label>أيام الإجازة</label><input type="number" name="vacation_days" class="form-control" value="1" min="0" required></div>
+            </div>
+        </div>
+        <div class="modal-footer"><button type="submit" class="btn btn-primary">حفظ</button></div>
+        </form>
+    </div>
+</div>
+
+<div class="modal" id="editShiftModal">
+    <div class="modal-content">
+        <form id="editShiftForm" method="POST">
+        <div class="modal-header"><h3>تعديل نوع الدوام</h3><button type="button" class="modal-close" onclick="closeModal('editShiftModal')">&times;</button></div>
+        <div class="modal-body">
+            <label>الاسم</label><input name="name" id="edit_name" class="form-control" required>
+            <label class="mt-2">الوصف</label><textarea name="description" id="edit_description" class="form-control" rows="2"></textarea>
+            <div class="row mt-2">
+                <div class="col-6"><label>أيام الدوام</label><input type="number" name="work_days" id="edit_work_days" class="form-control" min="1" required></div>
+                <div class="col-6"><label>أيام الإجازة</label><input type="number" name="vacation_days" id="edit_vacation_days" class="form-control" min="0" required></div>
+            </div>
+            <div class="mt-2">
+                <label>الحالة</label>
+                <select name="status" id="edit_status" class="form-control">
+                    <option value="active">نشط</option><option value="inactive">غير نشط</option>
+                </select>
+            </div>
+        </div>
+        <div class="modal-footer"><button type="submit" class="btn btn-primary">حفظ التعديلات</button></div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openEditShiftType(id) {
+    // Get shift type data from the server
+    fetch('/employee-transport/shift-types/api/' + id)
+        .then(r => r.json())
+        .then(data => {
+            document.getElementById('edit_name').value = data.name || '';
+            document.getElementById('edit_description').value = data.description || '';
+            document.getElementById('edit_work_days').value = data.work_days || 6;
+            document.getElementById('edit_vacation_days').value = data.vacation_days || 1;
+            document.getElementById('edit_status').value = data.status || 'active';
+            document.getElementById('editShiftForm').action = '/employee-transport/shift-types/edit/' + id;
+            openModal('editShiftModal');
+        });
+}
+</script>
+{% endblock %}

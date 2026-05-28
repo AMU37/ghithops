@@ -1,0 +1,104 @@
+from rest_framework import viewsets
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from .models import Employee, ServiceType
+from .serializers import EmployeeSerializer, ShiftTypeReadOnlySerializer, ServiceTypeSerializer
+from transport.models import ShiftType, EmployeeTransportInfo
+
+
+class EmployeeViewSet(viewsets.ModelViewSet):
+    module = 'employees'
+    serializer_class = EmployeeSerializer
+    permission_classes = [IsAuthenticated]
+    lookup_value_regex = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
+
+    def get_queryset(self):
+        qs = Employee.objects.filter(company=self.request.user.company)
+        # exclude manual-add temp records
+        qs = qs.exclude(employee_id__startswith='TEMP-').exclude(employee_id__startswith='MANUAL-')
+        return qs
+
+    def _save_extra_fields(self, request, company, employee):
+        dept_name = request.data.get('department_name')
+        if dept_name is not None:
+            if dept_name.strip():
+                from core.models import Department
+                dept = Department.objects.filter(company=company, name__iexact=dept_name.strip()).first()
+                if not dept:
+                    dept = Department.objects.create(company=company, name=dept_name.strip(), code=dept_name.strip()[:50])
+                employee.department = dept
+            else:
+                employee.department = None
+            employee.save(update_fields=['department'])
+
+        shift_type_id = request.data.get('shift_type')
+        city = request.data.get('city')
+        if shift_type_id or city:
+            defaults = {'company': company, 'employee_record': employee, 'employee_name': employee.full_name}
+            if shift_type_id:
+                defaults['shift_type_id'] = shift_type_id
+            if city:
+                defaults['city'] = city
+            EmployeeTransportInfo.objects.update_or_create(
+                employee_id=employee.employee_id,
+                defaults=defaults
+            )
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        company = request.user.company
+        employee_id = serializer.validated_data.get('employee_id')
+
+        existing = Employee.objects.filter(company=company, employee_id=employee_id).first()
+        if existing:
+            for attr, value in serializer.validated_data.items():
+                setattr(existing, attr, value)
+            existing.company = company
+            existing.save()
+            self._save_extra_fields(request, company, existing)
+            out_serializer = self.get_serializer(existing)
+            return Response(out_serializer.data, status=200)
+
+        employee = serializer.save(company=company)
+        self._save_extra_fields(request, company, employee)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=201, headers=headers)
+
+    def perform_update(self, serializer):
+        company = self.request.user.company
+        employee = serializer.save()
+        self._save_extra_fields(self.request, company, employee)
+
+    @action(detail=False, methods=['get'])
+    def shift_types(self, request):
+        qs = ShiftType.objects.filter(company=request.user.company, status='active')
+        serializer = ShiftTypeReadOnlySerializer(qs, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def service_types(self, request):
+        qs = ServiceType.objects.filter(company=request.user.company, status='active')
+        serializer = ServiceTypeSerializer(qs, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def by_department(self, request):
+        dept_id = request.query_params.get('department_id')
+        if not dept_id:
+            return Response([])
+        qs = Employee.objects.filter(company=request.user.company, department_id=dept_id)
+        return Response(EmployeeSerializer(qs, many=True).data)
+
+
+class ServiceTypeViewSet(viewsets.ModelViewSet):
+    module = 'employees'
+    serializer_class = ServiceTypeSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return ServiceType.objects.filter(company=self.request.user.company)
+
+    def perform_create(self, serializer):
+        serializer.save(company=self.request.user.company)

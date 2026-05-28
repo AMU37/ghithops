@@ -1,0 +1,61 @@
+{% extends 'base.html' %}
+{% block title %}المخالفات - الگھیث للنقليات{% endblock %}
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4><i class="fas fa-exclamation-triangle"></i> المخالفات</h4>
+    </div>
+    <div class="card">
+        <div class="card-body p-0">
+            {% if violations %}
+            <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead><tr><th>#</th><th>الموظف</th><th>النوع</th><th>الوصف</th><th>التاريخ</th><th>الحالة</th><th>الإجراءات</th></tr></thead>
+                <tbody>
+                {% for v in violations %}
+                <tr class="{{ 'table-warning' if not v.resolved }}">
+                    <td>{{ v.id }}</td>
+                    <td>{{ v.employee.name if v.employee else 'غير معروف' }}</td>
+                    <td><span class="badge bg-danger">{{ v.violation_type }}</span></td>
+                    <td>{{ v.description or '' }}</td>
+                    <td>{{ v.date }}</td>
+                    <td>
+                        {% if v.resolved %}
+                        <span class="badge bg-success">محلول</span>
+                        <small class="d-block text-muted">{{ v.resolved_at.strftime('%Y-%m-%d %H:%M') if v.resolved_at }}</small>
+                        {% else %}
+                        <span class="badge bg-danger">غير محلول</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if not v.resolved %}
+                        <button class="btn btn-success btn-sm" onclick="openModal('resolveModal{{ v.id }}')"><i class="fas fa-check"></i> حل</button>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            </div>
+            {% else %}<div class="text-center p-4">لا توجد مخالفات</div>{% endif %}
+        </div>
+    </div>
+</div>
+{% for v in violations if not v.resolved %}
+<div class="modal" id="resolveModal{{ v.id }}">
+    <div class="modal-content">
+        <form method="POST" action="{{ url_for('employee_transport.resolve_violation', id=v.id) }}">
+        <div class="modal-header"><h3>حل المخالفة #{{ v.id }}</h3><button type="button" class="modal-close" onclick="closeModal('resolveModal{{ v.id }}')">&times;</button></div>
+        <div class="modal-body">
+            <p><strong>الموظف:</strong> {{ v.employee.name if v.employee else '-' }}</p>
+            <p><strong>النوع:</strong> {{ v.violation_type }}</p>
+            <p><strong>الوصف:</strong> {{ v.description or '-' }}</p>
+            <label>ملاحظات الحل</label>
+            <textarea name="notes" class="form-control" rows="3" placeholder="أدخل ملاحظات الحل..."></textarea>
+        </div>
+        <div class="modal-footer"><button type="submit" class="btn btn-success">تأكيد الحل</button></div>
+        </form>
+    </div>
+</div>
+{% endfor %}
+{% endblock %}

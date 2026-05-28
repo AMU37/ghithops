@@ -1,0 +1,306 @@
+{% extends 'base.html' %}
+{% block title %}الموظفين - نقل الموظفين{% endblock %}
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+        <h4><i class="fas fa-users"></i> الموظفين</h4>
+        <div class="d-flex gap-2">
+            <div class="dropdown">
+                <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" onclick="var d=document.getElementById('colToggle');d.style.display=d.style.display=='none'?'block':'none'">
+                    <i class="fas fa-table-cells"></i> تخصيص الأعمدة
+                </button>
+                <div id="colToggle" class="dropdown-menu p-2" style="max-height:300px;overflow-y:auto;min-width:200px;display:none;position:absolute;right:0;z-index:1000;background:#fff;border:1px solid #ddd;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,.15)">
+                    {% for key, label in [
+                        ('code','الكود'),('name','الاسم'),('company','الشركة'),('position','الوظيفة'),
+                        ('department','القسم'),('shift_type','نوع الدوام'),('today_status','الحالة اليوم'),
+                        ('work_start','بداية الدوام'),('work_end','آخر يوم دوام'),
+                        ('vacation_start','أول يوم إجازة'),('vacation_end','آخر يوم إجازة'),
+                        ('route','الخط'),('city','المدينة'),
+                        ('arrival','وقت الوصول'),('departure','وقت الانصراف'),
+                        ('transport_type','نوع النقل'),('status','الحالة'),('actions','الإجراءات')
+                    ] %}
+                    <label class="d-block px-1 py-1" style="cursor:pointer;white-space:nowrap">
+                        <input type="checkbox" class="col-toggle" data-col="{{ key }}" {{ 'checked' if key in ('code','name','company','position','department','shift_type','today_status','actions') else '' }} onchange="toggleColumn(this)">
+                        {{ label }}
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="openModal('addEmpModal')"><i class="fas fa-plus"></i> إضافة موظف</button>
+        </div>
+    </div>
+    <div class="card">
+        <div class="card-body p-0">
+            {% if employees %}
+            <div class="table-responsive" style="overflow-x:auto">
+            <table class="table table-hover mb-0" id="empTable">
+                <thead><tr>
+                    <th data-col="code">الكود</th><th data-col="name">الاسم</th><th data-col="company">الشركة</th><th data-col="position">الوظيفة</th>
+                    <th data-col="department">القسم</th><th data-col="shift_type">نوع الدوام</th><th data-col="today_status">الحالة اليوم</th>
+                    <th data-col="work_start">بداية الدوام</th><th data-col="work_end">آخر يوم دوام</th>
+                    <th data-col="vacation_start">أول يوم إجازة</th><th data-col="vacation_end">آخر يوم إجازة</th>
+                    <th data-col="route">الخط</th><th data-col="city">المدينة</th>
+                    <th data-col="arrival">وقت الوصول</th><th data-col="departure">وقت الانصراف</th><th data-col="transport_type">نوع النقل</th>
+                    <th data-col="status">الحالة</th><th data-col="actions">الإجراءات</th>
+                </tr></thead>
+                <tbody>
+                {% for emp in employees %}
+                {% set et = et_infos.get(emp.id) %}
+                {% set cs = cycle_statuses.get(emp.id) %}
+                <tr>
+                    <td data-col="code"><strong>{{ emp.code or '-' }}</strong></td>
+                    <td data-col="name">{{ emp.name }}</td>
+                    <td data-col="company">{{ emp.company.name if emp.company else '-' }}</td>
+                    <td data-col="position">{{ emp.position or '-' }}</td>
+                    <td data-col="department">{{ et.department if et else '-' }}</td>
+                    <td data-col="shift_type">{{ et.shift_type.name if et and et.shift_type else '-' }}</td>
+                    <td data-col="today_status">
+                        {% if cs %}
+                        <span class="badge bg-{{ cs.color }}">{{ cs.label }}</span>
+                        {% else %}-{% endif %}
+                    </td>
+                    <td data-col="work_start">{{ cs.work_start.strftime('%Y-%m-%d') if cs else '-' }}</td>
+                    <td data-col="work_end">{{ cs.work_end.strftime('%Y-%m-%d') if cs else '-' }}</td>
+                    <td data-col="vacation_start">{{ cs.vacation_start.strftime('%Y-%m-%d') if cs else '-' }}</td>
+                    <td data-col="vacation_end">{{ cs.vacation_end.strftime('%Y-%m-%d') if cs else '-' }}</td>
+                    <td data-col="route">{{ et.route.name if et and et.route else '-' }}</td>
+                    <td data-col="city">{{ et.city if et else '-' }}</td>
+                    <td data-col="arrival">{{ et.arrival_time.strftime('%H:%M') if et and et.arrival_time else '-' }}</td>
+                    <td data-col="departure">{{ et.departure_time.strftime('%H:%M') if et and et.departure_time else '-' }}</td>
+                    <td data-col="transport_type">{{ et.transport_type if et else 'ورديات' }}</td>
+                    <td data-col="status"><span class="badge bg-{{ 'success' if emp.status == 'active' else 'danger' }}">{{ 'نشط' if emp.status == 'active' else 'غير نشط' }}</span></td>
+                    <td data-col="actions">
+                        <button class="btn btn-warning btn-sm" onclick="openEditEmp({{ emp.id }})"><i class="fas fa-edit"></i></button>
+                        <form action="{{ url_for('employee_transport.delete_et_employee', id=emp.id) }}" method="POST" style="display:inline">
+                            <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('حذف الموظف {{ emp.name }}؟')"><i class="fas fa-trash"></i></button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            </div>
+            {% else %}<div class="text-center p-4">لا يوجد موظفين</div>{% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="modal" id="addEmpModal">
+    <div class="modal-content">
+        <form method="POST" action="{{ url_for('employee_transport.add_et_employee') }}">
+        <div class="modal-header"><h3>إضافة موظف</h3><button type="button" class="modal-close" onclick="closeModal('addEmpModal')">&times;</button></div>
+        <div class="modal-body">
+            <label>الاسم الكامل *</label><input name="name" class="form-control" required>
+            <div class="row mt-2">
+                <div class="col-6"><label>الشركة</label><input name="et_external_company" class="form-control"></div>
+                <div class="col-6"><label>الوظيفة</label><input name="position" class="form-control"></div>
+            </div>
+            <div class="row mt-2">
+                <div class="col-6"><label>تاريخ الميلاد</label><input type="date" name="birth_date" class="form-control"></div>
+                <div class="col-6"><label>مكان الميلاد</label><input name="birth_place" class="form-control"></div>
+            </div>
+            <div class="row mt-2">
+                <div class="col-6"><label>تاريخ الالتحاق</label><input type="date" name="join_date" class="form-control"></div>
+                <div class="col-6"><label>المنطقة</label><input name="area" class="form-control"></div>
+            </div>
+            <hr class="mt-3">
+            <h6 style="color:#1a73e8"><i class="fas fa-bus"></i> بيانات النقل</h6>
+            <div class="row mt-2">
+                <div class="col-6"><label>القسم</label><input name="et_department" class="form-control"></div>
+                <div class="col-6"><label>الوردية</label>
+                    <select name="et_shift_type_id" class="form-control">
+                        <option value="">---</option>
+                        {% for st in et_shift_types %}<option value="{{ st.id }}">{{ st.name }}</option>{% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="row mt-2">
+                <div class="col-4"><label>تاريخ بدء الوردية</label><input type="date" name="et_shift_start_date" class="form-control"></div>
+                <div class="col-4"><label>يوم العمل</label>
+                    <select name="et_work_day" class="form-control">
+                        <option value="">---</option>
+                        <option value="السبت">السبت</option><option value="الأحد">الأحد</option>
+                        <option value="الإثنين">الإثنين</option><option value="الثلاثاء">الثلاثاء</option>
+                        <option value="الأربعاء">الأربعاء</option><option value="الخميس">الخميس</option>
+                        <option value="الجمعة">الجمعة</option>
+                    </select>
+                </div>
+                <div class="col-4"><label>حالة الحركة</label>
+                    <select name="et_movement_status" class="form-control">
+                        <option value="">---</option>
+                        <option value="ثابت">ثابت</option><option value="متحرك">متحرك</option>
+                    </select>
+                </div>
+            </div>
+            <div class="row mt-2">
+                <div class="col-4"><label>وقت الوصول</label><input type="time" name="et_arrival_time" class="form-control"></div>
+                <div class="col-4"><label>وقت الانصراف</label><input type="time" name="et_departure_time" class="form-control"></div>
+                <div class="col-4"><label>الخط</label>
+                    <select name="et_route_id" class="form-control">
+                        <option value="">---</option>
+                        {% for r in et_routes %}<option value="{{ r.id }}">{{ r.name }}</option>{% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="row mt-2">
+                <div class="col-4"><label>المدينة</label><input name="et_city" class="form-control"></div>
+                <div class="col-4"><label>مكان السكن</label><input name="et_residence_location" class="form-control"></div>
+                <div class="col-4"><label>نظام العمل</label>
+                    <select name="et_transport_type" class="form-control">
+                        <option value="ورديات">ورديات</option><option value="إداري">إداري</option>
+                    </select>
+                </div>
+            </div>
+            </div>
+            <label class="mt-2">ملاحظات</label><textarea name="notes" class="form-control" rows="2"></textarea>
+            <hr class="mt-3">
+            <div class="mt-2">
+                <label><input type="checkbox" name="create_user" onchange="document.getElementById('addUserFields').style.display=this.checked?'block':'none'"> إنشاء حساب مستخدم</label>
+            </div>
+            <div id="addUserFields" style="display:none" class="mt-2 p-2" style="background:#f8f9fa;border-radius:6px">
+                <div class="row">
+                    <div class="col-6"><label>اسم المستخدم</label><input name="user_username" class="form-control" placeholder="تلقائي"></div>
+                    <div class="col-6"><label>كلمة المرور</label><input name="user_password" class="form-control" value="123456"></div>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" onclick="closeModal('addEmpModal')">إلغاء</button>
+            <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> حفظ</button>
+        </div>
+        </form>
+    </div>
+</div>
+
+<div class="modal" id="editEmpModal">
+    <div class="modal-content">
+        <form id="editEmpForm" method="POST">
+        <div class="modal-header"><h3>تعديل بيانات الموظف</h3><button type="button" class="modal-close" onclick="closeModal('editEmpModal')">&times;</button></div>
+        <div class="modal-body">
+            <label>الاسم الكامل *</label><input name="name" id="edit_name" class="form-control" required>
+            <div class="row mt-2">
+                <div class="col-6"><label>الشركة</label><input name="et_external_company" id="edit_et_external_company" class="form-control"></div>
+                <div class="col-6"><label>الكود</label><input name="code" id="edit_code" class="form-control"></div>
+            </div>
+            <div class="row mt-2">
+                <div class="col-6"><label>الوظيفة</label><input name="position" id="edit_position" class="form-control"></div>
+                <div class="col-6"><label>تاريخ الميلاد</label><input type="date" name="birth_date" id="edit_birth_date" class="form-control"></div>
+            </div>
+            <div class="row mt-2">
+                <div class="col-6"><label>مكان الميلاد</label><input name="birth_place" id="edit_birth_place" class="form-control"></div>
+                <div class="col-6"><label>تاريخ الالتحاق</label><input type="date" name="join_date" id="edit_join_date" class="form-control"></div>
+            </div>
+            <div class="row mt-2">
+                <div class="col-6"><label>المنطقة</label><input name="area" id="edit_area" class="form-control"></div>
+                <div class="col-6">
+                    <label>الحالة</label>
+                    <select name="status" id="edit_status" class="form-control">
+                        <option value="active">نشط</option><option value="inactive">غير نشط</option>
+                    </select>
+                </div>
+            </div>
+            <hr class="mt-3">
+            <h6 style="color:#1a73e8"><i class="fas fa-bus"></i> بيانات النقل</h6>
+            <div class="row mt-2">
+                <div class="col-6"><label>القسم</label><input name="et_department" id="edit_et_department" class="form-control"></div>
+                <div class="col-6"><label>الوردية</label>
+                    <select name="et_shift_type_id" id="edit_et_shift_type_id" class="form-control">
+                        <option value="">---</option>
+                        {% for st in et_shift_types %}<option value="{{ st.id }}">{{ st.name }}</option>{% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="row mt-2">
+                <div class="col-4"><label>تاريخ بدء الوردية</label><input type="date" name="et_shift_start_date" id="edit_et_shift_start_date" class="form-control"></div>
+                <div class="col-4"><label>يوم العمل</label>
+                    <select name="et_work_day" id="edit_et_work_day" class="form-control">
+                        <option value="">---</option>
+                        <option value="السبت">السبت</option><option value="الأحد">الأحد</option>
+                        <option value="الإثنين">الإثنين</option><option value="الثلاثاء">الثلاثاء</option>
+                        <option value="الأربعاء">الأربعاء</option><option value="الخميس">الخميس</option>
+                        <option value="الجمعة">الجمعة</option>
+                    </select>
+                </div>
+                <div class="col-4"><label>حالة الحركة</label>
+                    <select name="et_movement_status" id="edit_et_movement_status" class="form-control">
+                        <option value="">---</option>
+                        <option value="ثابت">ثابت</option><option value="متحرك">متحرك</option>
+                    </select>
+                </div>
+            </div>
+            <div class="row mt-2">
+                <div class="col-4"><label>وقت الوصول</label><input type="time" name="et_arrival_time" id="edit_et_arrival_time" class="form-control"></div>
+                <div class="col-4"><label>وقت الانصراف</label><input type="time" name="et_departure_time" id="edit_et_departure_time" class="form-control"></div>
+                <div class="col-4"><label>الخط</label>
+                    <select name="et_route_id" id="edit_et_route_id" class="form-control">
+                        <option value="">---</option>
+                        {% for r in et_routes %}<option value="{{ r.id }}">{{ r.name }}</option>{% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="row mt-2">
+                <div class="col-6"><label>المدينة</label><input name="et_city" id="edit_et_city" class="form-control"></div>
+                <div class="col-6"><label>مكان السكن</label><input name="et_residence_location" id="edit_et_residence_location" class="form-control"></div>
+            </div>
+            <div class="row mt-2">
+                <div class="col-6"><label>نظام العمل</label>
+                    <select name="et_transport_type" id="edit_et_transport_type" class="form-control">
+                        <option value="ورديات">ورديات</option><option value="إداري">إداري</option>
+                    </select>
+                </div>
+            </div>
+            <label class="mt-2">ملاحظات</label><textarea name="notes" id="edit_notes" class="form-control" rows="2"></textarea>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" onclick="closeModal('editEmpModal')">إلغاء</button>
+            <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> حفظ التعديلات</button>
+        </div>
+        </form>
+    </div>
+</div>
+
+<script>
+// column visibility
+function toggleColumn(cb) {
+    var col = cb.getAttribute('data-col');
+    var cells = document.querySelectorAll('[data-col="' + col + '"]');
+    var display = cb.checked ? '' : 'none';
+    cells.forEach(function(el) { el.style.display = display; });
+    var prefs = JSON.parse(localStorage.getItem('et_cols') || '{}');
+    prefs[col] = cb.checked;
+    localStorage.setItem('et_cols', JSON.stringify(prefs));
+}
+function loadColumnPrefs() {
+    var prefs = JSON.parse(localStorage.getItem('et_cols') || '{}');
+    document.querySelectorAll('.col-toggle').forEach(function(cb) {
+        var col = cb.getAttribute('data-col');
+        if (prefs[col] !== undefined) {
+            cb.checked = prefs[col];
+        }
+        toggleColumn(cb);
+    });
+}
+document.addEventListener('click', function(e) {
+    var dd = document.getElementById('colToggle');
+    if (dd && dd.style.display !== 'none' && !e.target.closest('.dropdown')) {
+        dd.style.display = 'none';
+    }
+});
+loadColumnPrefs();
+
+function openEditEmp(id) {
+    fetch('/employee-transport/employees/api/' + id).then(r => r.json()).then(data => {
+        for (let k of ['name','code','position','birth_date','birth_place',
+                       'join_date','area','notes','status','et_department','et_shift_type_id',
+                       'et_shift_start_date','et_work_day','et_movement_status',
+                       'et_arrival_time','et_departure_time','et_route_id','et_city',
+                       'et_external_company','et_residence_location','et_transport_type']) {
+            let el = document.getElementById('edit_' + k);
+            if (el) el.value = data[k] || '';
+        }
+        document.getElementById('editEmpForm').action = '/employee-transport/employees/edit/' + id;
+        openModal('editEmpModal');
+    });
+}
+</script>
+{% endblock %}
