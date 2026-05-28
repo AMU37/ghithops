@@ -10,7 +10,7 @@ import {
   Bot, FileText, BarChart3, ChevronDown, Check
 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { api } from "@/lib/api"
+import api from "@/lib/api"
 
 const allMenuItems = [
   { href: "/dashboard", label: "لوحة التحكم", icon: LayoutDashboard, roles: ["super_admin", "company_admin", "department_user"], excludeDepartments: ["الطلبات"] },
