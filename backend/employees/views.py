@@ -14,10 +14,23 @@ class EmployeeViewSet(viewsets.ModelViewSet):
     lookup_value_regex = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
 
     def get_queryset(self):
-        qs = Employee.objects.filter(company=self.request.user.company)
-        # exclude manual-add temp records
+        user = self.request.user
+        if user.role == 'super_admin':
+            qs = Employee.objects.all()
+        else:
+            qs = Employee.objects.filter(company=user.company)
         qs = qs.exclude(employee_id__startswith='TEMP-').exclude(employee_id__startswith='MANUAL-')
         return qs
+
+    def _resolve_company(self, request):
+        """Allow super_admin to create employees for any company."""
+        if request.user.role == 'super_admin' and request.data.get('company'):
+            from core.models import Company
+            try:
+                return Company.objects.get(id=request.data['company'])
+            except (Company.DoesNotExist, ValueError):
+                pass
+        return request.user.company
 
     def _save_extra_fields(self, request, company, employee):
         dept_name = request.data.get('department_name')
@@ -48,7 +61,7 @@ class EmployeeViewSet(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        company = request.user.company
+        company = self._resolve_company(request)
         employee_id = serializer.validated_data.get('employee_id')
 
         existing = Employee.objects.filter(company=company, employee_id=employee_id).first()
@@ -67,8 +80,11 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         return Response(serializer.data, status=201, headers=headers)
 
     def perform_update(self, serializer):
-        company = self.request.user.company
+        company = self._resolve_company(self.request)
         employee = serializer.save()
+        if company != employee.company:
+            employee.company = company
+            employee.save(update_fields=['company'])
         self._save_extra_fields(self.request, company, employee)
 
     @action(detail=False, methods=['get'])

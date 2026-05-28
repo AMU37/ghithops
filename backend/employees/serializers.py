@@ -6,6 +6,7 @@ from transport.models import ShiftType, EmployeeTransportInfo
 class EmployeeSerializer(serializers.ModelSerializer):
     department_name = serializers.CharField(source='department.name', read_only=True, allow_null=True)
     service_type_name = serializers.CharField(source='service_type.name', read_only=True, allow_null=True)
+    company_name = serializers.CharField(source='company.name', read_only=True, allow_null=True)
     shift_type = serializers.SerializerMethodField()
     shift_type_name = serializers.SerializerMethodField()
     city = serializers.SerializerMethodField()
@@ -13,7 +14,7 @@ class EmployeeSerializer(serializers.ModelSerializer):
     class Meta:
         model = Employee
         fields = '__all__'
-        read_only_fields = ['id', 'company', 'created_at', 'department']
+        read_only_fields = ['id', 'created_at', 'department']
 
     def get_shift_type(self, obj):
         st_id = getattr(obj, '_transport_shift_type_id', None)
