@@ -56,24 +56,25 @@ class AIChatViewSet(viewsets.ModelViewSet):
         AIMessage.objects.create(chat=chat, role='user', content=message)
 
         try:
-            from openai import OpenAI
-            client = OpenAI()
+            import google.generativeai as genai
+            genai.configure(api_key=__import__('os').environ.get('GEMINI_API_KEY', ''))
 
-            history = chat.messages.all().values('role', 'content')
-            messages = [{"role": "system", "content": "أنت مساعد ذكي لنظام غيث لأتمتة العمليات الإدارية التشغيلية. أجب باللغة العربية."}]
+            history = list(chat.messages.all().values('role', 'content'))
+            gemini_history = []
             for msg in history:
-                messages.append({"role": msg['role'], "content": msg['content']})
+                role = "user" if msg['role'] == "user" else "model"
+                gemini_history.append({"role": role, "parts": [msg['content']]})
 
-            response = client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=messages,
-                max_tokens=1000,
+            model = genai.GenerativeModel(
+                'gemini-2.0-flash',
+                system_instruction="أنت مساعد ذكي لنظام غيث لأتمتة العمليات الإدارية التشغيلية. أجب باللغة العربية."
             )
+            chat_session = model.start_chat(history=gemini_history)
+            response = chat_session.send_message(message)
 
-            reply = response.choices[0].message.content
-            tokens = response.usage.total_tokens if response.usage else 0
+            reply = response.text
 
-            AIMessage.objects.create(chat=chat, role='assistant', content=reply, tokens_used=tokens)
+            AIMessage.objects.create(chat=chat, role='assistant', content=reply)
 
             if not chat.title or chat.title == message[:50]:
                 chat.title = message[:80]
@@ -82,7 +83,6 @@ class AIChatViewSet(viewsets.ModelViewSet):
             return Response({
                 'chat_id': chat.id,
                 'reply': reply,
-                'tokens_used': tokens,
             })
 
         except Exception as e:
@@ -105,29 +105,29 @@ class AIChatViewSet(viewsets.ModelViewSet):
         chat.messages.filter(role='assistant', chat=chat).delete()
 
         try:
-            from openai import OpenAI
-            client = OpenAI()
+            import google.generativeai as genai
+            genai.configure(api_key=__import__('os').environ.get('GEMINI_API_KEY', ''))
 
-            history = chat.messages.all().values('role', 'content')
-            messages = [{"role": "system", "content": "أنت مساعد ذكي لنظام غيث."}]
+            history = list(chat.messages.all().values('role', 'content'))
+            gemini_history = []
             for msg in history:
-                messages.append({"role": msg['role'], "content": msg['content']})
+                role = "user" if msg['role'] == "user" else "model"
+                gemini_history.append({"role": role, "parts": [msg['content']]})
 
-            response = client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=messages,
-                max_tokens=1000,
+            model = genai.GenerativeModel(
+                'gemini-2.0-flash',
+                system_instruction="أنت مساعد ذكي لنظام غيث."
             )
+            chat_session = model.start_chat(history=gemini_history)
+            response = chat_session.send_message(history[-1]['content'])
 
-            reply = response.choices[0].message.content
-            tokens = response.usage.total_tokens if response.usage else 0
+            reply = response.text
 
-            AIMessage.objects.create(chat=chat, role='assistant', content=reply, tokens_used=tokens)
+            AIMessage.objects.create(chat=chat, role='assistant', content=reply)
 
             return Response({
                 'chat_id': chat.id,
                 'reply': reply,
-                'tokens_used': tokens,
             })
 
         except Exception as e:
@@ -164,26 +164,20 @@ class OCRDocumentViewSet(viewsets.ModelViewSet):
         )
 
         try:
-            from openai import OpenAI
-            client = OpenAI()
+            import google.generativeai as genai
+            genai.configure(api_key=__import__('os').environ.get('GEMINI_API_KEY', ''))
 
             image_content = image_data
             if ',' in image_data:
                 image_content = image_data.split(',')[1]
 
-            response = client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[
-                    {"role": "system", "content": "استخرج كل النصوص من هذه الصورة وأعدها كما هي باللغة العربية."},
-                    {"role": "user", "content": [
-                        {"type": "text", "text": "ما النص الموجود في هذه الصورة؟"},
-                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_content}"}},
-                    ]},
-                ],
-                max_tokens=2000,
-            )
+            model = genai.GenerativeModel('gemini-2.0-flash')
+            response = model.generate_content([
+                "استخرج كل النصوص من هذه الصورة وأعدها كما هي باللغة العربية.",
+                {"mime_type": "image/jpeg", "data": image_content}
+            ])
 
-            extracted = response.choices[0].message.content
+            extracted = response.text
             doc.extracted_text = extracted
             doc.save()
 
