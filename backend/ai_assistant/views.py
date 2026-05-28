@@ -340,7 +340,8 @@ class AIChatViewSet(viewsets.ModelViewSet):
             })
 
         except Exception as e:
-            error_msg = str(e)
+            import traceback
+            error_msg = traceback.format_exc()
             reply = "عذراً، حدث خطأ في الاتصال بالمساعد الذكي. يرجى التحقق من مفتاح API."
             AIMessage.objects.create(chat=chat, role='assistant', content=reply)
             return Response({
@@ -368,9 +369,10 @@ class AIChatViewSet(viewsets.ModelViewSet):
             })
 
         except Exception as e:
+            import traceback
             return Response({
                 'reply': "عذراً، حدث خطأ في الاتصال بالمساعد الذكي.",
-                'error': str(e),
+                'error': traceback.format_exc(),
             })
 
 
