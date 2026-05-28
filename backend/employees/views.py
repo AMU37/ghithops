@@ -16,7 +16,11 @@ class EmployeeViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         if user.role == 'super_admin':
-            qs = Employee.objects.all()
+            company_id = self.request.META.get('HTTP_X_COMPANY_ID')
+            if company_id:
+                qs = Employee.objects.filter(company_id=company_id)
+            else:
+                qs = Employee.objects.all()
         else:
             qs = Employee.objects.filter(company=user.company)
         qs = qs.exclude(employee_id__startswith='TEMP-').exclude(employee_id__startswith='MANUAL-')
@@ -91,7 +95,11 @@ class EmployeeViewSet(viewsets.ModelViewSet):
     def shift_types(self, request):
         user = request.user
         if user.role == 'super_admin':
-            qs = ShiftType.objects.filter(status='active')
+            company_id = request.META.get('HTTP_X_COMPANY_ID')
+            if company_id:
+                qs = ShiftType.objects.filter(company_id=company_id, status='active')
+            else:
+                qs = ShiftType.objects.filter(status='active')
         else:
             qs = ShiftType.objects.filter(company=user.company, status='active')
         serializer = ShiftTypeReadOnlySerializer(qs, many=True)
@@ -101,7 +109,11 @@ class EmployeeViewSet(viewsets.ModelViewSet):
     def service_types(self, request):
         user = request.user
         if user.role == 'super_admin':
-            qs = ServiceType.objects.filter(status='active')
+            company_id = request.META.get('HTTP_X_COMPANY_ID')
+            if company_id:
+                qs = ServiceType.objects.filter(company_id=company_id, status='active')
+            else:
+                qs = ServiceType.objects.filter(status='active')
         else:
             qs = ServiceType.objects.filter(company=user.company, status='active')
         serializer = ServiceTypeSerializer(qs, many=True)
@@ -114,7 +126,11 @@ class EmployeeViewSet(viewsets.ModelViewSet):
             return Response([])
         user = request.user
         if user.role == 'super_admin':
-            qs = Employee.objects.filter(department_id=dept_id)
+            company_id = request.META.get('HTTP_X_COMPANY_ID')
+            if company_id:
+                qs = Employee.objects.filter(company_id=company_id, department_id=dept_id)
+            else:
+                qs = Employee.objects.filter(department_id=dept_id)
         else:
             qs = Employee.objects.filter(company=user.company, department_id=dept_id)
         return Response(EmployeeSerializer(qs, many=True).data)

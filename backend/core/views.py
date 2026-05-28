@@ -117,6 +117,9 @@ class UserViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         if user.role == 'super_admin':
+            company_id = self.request.META.get('HTTP_X_COMPANY_ID')
+            if company_id:
+                return User.objects.filter(company_id=company_id)
             return User.objects.all()
         return User.objects.filter(company=user.company)
 
@@ -165,6 +168,9 @@ class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         user = self.request.user
         if user.role == 'super_admin':
+            company_id = self.request.META.get('HTTP_X_COMPANY_ID')
+            if company_id:
+                return AuditLog.objects.filter(company_id=company_id)
             return AuditLog.objects.all()
         return AuditLog.objects.filter(company=user.company)
 
@@ -177,6 +183,9 @@ class NotificationViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         if user.role == 'super_admin':
+            company_id = self.request.META.get('HTTP_X_COMPANY_ID')
+            if company_id:
+                return Notification.objects.filter(company_id=company_id)
             return Notification.objects.all()
         return Notification.objects.filter(company=user.company)
 

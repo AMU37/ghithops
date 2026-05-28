@@ -1,15 +1,16 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import {
   LayoutDashboard, Building2, Users, Bell,
   Truck, Home, Wrench, Sparkles, Sprout, Sofa,
   LogOut, ChevronLeft, Shield, ClipboardList,
-  Bot, FileText, BarChart3, MessageSquare
+  Bot, FileText, BarChart3, ChevronDown, Check
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { api } from "@/lib/api"
 
 const allMenuItems = [
   { href: "/dashboard", label: "لوحة التحكم", icon: LayoutDashboard, roles: ["super_admin", "company_admin", "department_user"], excludeDepartments: ["الطلبات"] },
@@ -36,14 +37,37 @@ export function Sidebar() {
   const router = useRouter()
   const [role, setRole] = useState("")
   const [department, setDepartment] = useState("")
+  const [companies, setCompanies] = useState<any[]>([])
+  const [selectedCompany, setSelectedCompany] = useState<any>(null)
+  const [companyOpen, setCompanyOpen] = useState(false)
 
-  useEffect(() => {
+  const loadUser = useCallback(() => {
     try {
       const user = JSON.parse(localStorage.getItem("user") || "{}")
       setRole(user.role || "")
       setDepartment(user.department_name || "")
+      const sc = JSON.parse(localStorage.getItem("selected_company") || "null")
+      setSelectedCompany(sc)
     } catch {}
   }, [])
+
+  useEffect(() => { loadUser() }, [loadUser])
+
+  useEffect(() => {
+    if (role === "super_admin") {
+      api.get("/companies/").then((res) => {
+        setCompanies(res.data.results || res.data || [])
+      }).catch(() => {})
+    }
+  }, [role])
+
+  const switchCompany = (c: any) => {
+    localStorage.setItem("selected_company", JSON.stringify({ id: c.id, name: c.name }))
+    setSelectedCompany({ id: c.id, name: c.name })
+    setCompanyOpen(false)
+    // Refresh the page to apply new company context
+    router.refresh()
+  }
 
   const menuItems = allMenuItems.filter((item) => {
     if (!item.roles.includes(role)) return false
@@ -65,6 +89,33 @@ export function Sidebar() {
         </div>
         <span className="text-lg font-bold text-amber-500">GhithOps</span>
       </div>
+
+      {role === "super_admin" && (
+        <div className="relative border-b border-zinc-800 px-4 py-3">
+          <button
+            onClick={() => setCompanyOpen(!companyOpen)}
+            className="flex w-full items-center gap-2 rounded-md bg-zinc-900 px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-800 transition-colors"
+          >
+            <Building2 className="h-4 w-4 text-amber-500" />
+            <span className="flex-1 text-right">{selectedCompany?.name || "اختر الشركة"}</span>
+            <ChevronDown className={`h-3 w-3 transition-transform ${companyOpen ? "rotate-180" : ""}`} />
+          </button>
+          {companyOpen && (
+            <div className="absolute left-4 right-4 top-full z-50 mt-1 rounded-md border border-zinc-700 bg-zinc-900 shadow-xl">
+              {companies.map((c) => (
+                <button
+                  key={c.id}
+                  onClick={() => switchCompany(c)}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-800 transition-colors text-right"
+                >
+                  <span className="flex-1">{c.name}</span>
+                  {selectedCompany?.id === c.id && <Check className="h-3 w-3 text-amber-500" />}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       <nav className="flex-1 overflow-y-auto px-4 py-4">
         <div className="flex flex-col gap-1">

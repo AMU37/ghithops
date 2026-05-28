@@ -24,17 +24,33 @@ const pageTitles: Record<string, string> = {
 export function Navbar() {
   const pathname = usePathname()
   const router = useRouter()
-  const [user, setUser] = useState({ full_name: "", company_name: "", department_name: "" })
+  const [user, setUser] = useState({ full_name: "", company_name: "", department_name: "", role: "" })
+  const [selectedCompany, setSelectedCompany] = useState<any>(null)
 
   useEffect(() => {
     try {
       const u = JSON.parse(localStorage.getItem("user") || "{}")
-      setUser({ full_name: u.full_name || "", company_name: u.company_name || "", department_name: u.department_name || "" })
+      setUser({ full_name: u.full_name || "", company_name: u.company_name || "", department_name: u.department_name || "", role: u.role || "" })
+      const sc = JSON.parse(localStorage.getItem("selected_company") || "null")
+      setSelectedCompany(sc)
     } catch {}
+  }, [])
+
+  // Listen for storage changes (e.g. when sidebar switches company)
+  useEffect(() => {
+    const handler = () => {
+      try {
+        const sc = JSON.parse(localStorage.getItem("selected_company") || "null")
+        setSelectedCompany(sc)
+      } catch {}
+    }
+    window.addEventListener("storage", handler)
+    return () => window.removeEventListener("storage", handler)
   }, [])
 
   const showBack = pathname !== "/dashboard"
   const currentTitle = pageTitles[pathname] || ""
+  const displayCompany = selectedCompany?.name || user.company_name
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b border-zinc-800 bg-zinc-950/95 backdrop-blur px-6">
@@ -46,7 +62,7 @@ export function Navbar() {
       {currentTitle && <span className="text-sm font-medium text-zinc-400">{currentTitle}</span>}
       <div className="flex-1" />
       <div className="flex items-center gap-3 text-xs text-zinc-500 ml-4">
-        <span className="hidden sm:inline">{user.company_name && `${user.company_name} /`} {user.department_name}</span>
+        <span className="hidden sm:inline">{displayCompany && `${displayCompany} /`} {user.department_name}</span>
         <span className="text-zinc-300">{user.full_name}</span>
       </div>
       <div className="flex items-center gap-2">
